@@ -97,14 +97,16 @@ jobs:
           artifact_prefix_input="${{ github.event.inputs.artifact_prefix || 'srpm' }}"
           artifact_name="${artifact_prefix_input}-${GITHUB_REPOSITORY##*/}-${version}-${release_input}"
 
-          echo "RPM_VERSION=${version}" >> "${GITHUB_ENV}"
-          echo "RPM_RELEASE=${release_input}" >> "${GITHUB_ENV}"
-          echo "RPM_BUILD_SCRIPT=${build_script_input}" >> "${GITHUB_ENV}"
-          echo "RPM_SPEC_PATH=${spec_path_input}" >> "${GITHUB_ENV}"
-          echo "RPM_OUTPUT_DIR=${output_dir_input}" >> "${GITHUB_ENV}"
-          echo "RPM_SRPM_GLOB=${srpm_glob_input}" >> "${GITHUB_ENV}"
-          echo "RPM_ARTIFACT_PREFIX=${artifact_prefix_input}" >> "${GITHUB_ENV}"
-          echo "RPM_ARTIFACT_NAME=${artifact_name}" >> "${GITHUB_ENV}"
+          {
+            echo "RPM_VERSION=${version}"
+            echo "RPM_RELEASE=${release_input}"
+            echo "RPM_BUILD_SCRIPT=${build_script_input}"
+            echo "RPM_SPEC_PATH=${spec_path_input}"
+            echo "RPM_OUTPUT_DIR=${output_dir_input}"
+            echo "RPM_SRPM_GLOB=${srpm_glob_input}"
+            echo "RPM_ARTIFACT_PREFIX=${artifact_prefix_input}"
+            echo "RPM_ARTIFACT_NAME=${artifact_name}"
+          } >> "${GITHUB_ENV}"
 
       - name: Build source RPM
         shell: bash
@@ -177,4 +179,3 @@ jobs:
           printf '%s\n' "${COPR_CONFIG}" > "${HOME}/.config/copr"
 
           copr-cli build "${copr_owner}/${copr_project}" "${SRPM_PATH}"
-
