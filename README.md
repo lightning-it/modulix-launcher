@@ -18,14 +18,13 @@ For a complete local image build/start workflow, see:
 
 ```bash
 export WORKSPACE_ROOT="$PWD"
-export MODULIX_LAUNCHER="$WORKSPACE_ROOT/modulix-launcher/modulix-launcher"
 export INVENTORY_DIR="$WORKSPACE_ROOT/ansible-inventory-lit/inventories"
 export INVENTORY_NAME="<inventory-name>"   # e.g. corp, ...
 export VAULT_PASS_FILE="$WORKSPACE_ROOT/.vault-pass.txt"
 # optional: disable TLS cert verification for image pulls
 export RUN_SKIP_CERT_CHECK=false
 [[ -s "$VAULT_PASS_FILE" ]] || { echo "ERROR: missing or empty Vault password file: $VAULT_PASS_FILE" >&2; false; }
-[[ -x "$MODULIX_LAUNCHER" ]] || { echo "ERROR: launcher script not found: $MODULIX_LAUNCHER" >&2; false; }
+command -v modulix-launcher >/dev/null || { echo "ERROR: modulix-launcher not found in PATH" >&2; false; }
 ```
 
 If your mirror uses an untrusted/private CA:
@@ -65,35 +64,35 @@ If it is unset, nothing is forwarded.
 Open an interactive toolbox shell with the same runtime options/mounts/env as service runs:
 
 ```bash
-"$MODULIX_LAUNCHER" --inventory-dir "$INVENTORY_DIR" toolbox shell
+modulix-launcher --inventory-dir "$INVENTORY_DIR" toolbox shell
 ```
 
 Before opening the shell, `modulix-launcher` preloads `RUN_EE_IMAGE` into the toolbox (`podman save` -> `podman load`).
 
 ```bash
-"$MODULIX_LAUNCHER" --inventory-dir "$INVENTORY_DIR" services wunderbox \
+modulix-launcher --inventory-dir "$INVENTORY_DIR" services wunderbox \
   -i "inventories/$INVENTORY_NAME/inventory.yml" --limit <HOST>
 ```
 
 ```bash
-"$MODULIX_LAUNCHER" --inventory-dir "$INVENTORY_DIR" services wunderbox --rebuild \
+modulix-launcher --inventory-dir "$INVENTORY_DIR" services wunderbox --rebuild \
   -i "inventories/$INVENTORY_NAME/inventory.yml" --limit <HOST>
 ```
 
 ```bash
-"$MODULIX_LAUNCHER" --inventory-dir "$INVENTORY_DIR" services aap \
+modulix-launcher --inventory-dir "$INVENTORY_DIR" services aap \
   -i "inventories/$INVENTORY_NAME/inventory.yml" --limit <HOST>
 ```
 
 ```bash
-"$MODULIX_LAUNCHER" --inventory-dir "$INVENTORY_DIR" services aap --rebuild \
+modulix-launcher --inventory-dir "$INVENTORY_DIR" services aap --rebuild \
   -i "inventories/$INVENTORY_NAME/inventory.yml" --limit <HOST>
 ```
 
 Run a specific playbook in `services` mode:
 
 ```bash
-"$MODULIX_LAUNCHER" --inventory-dir "$INVENTORY_DIR" services wunderbox \
+modulix-launcher --inventory-dir "$INVENTORY_DIR" services wunderbox \
   --playbook playbooks/services/12-wunderbox-service-stack.yml \
   -i "inventories/$INVENTORY_NAME/inventory.yml" --limit <HOST>
 ```
