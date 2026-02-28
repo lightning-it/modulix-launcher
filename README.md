@@ -103,7 +103,7 @@ Supported `--playbook` forms:
 - `ansible/playbooks/...` (resolved to `/runner/project/ansible/playbooks/...`)
 - `<subpath>.yml` (resolved to `/opt/modulix/ansible/playbooks/<subpath>.yml`)
 
-## Customer: Use Published Artifacts
+## Operators: Use Published Artifacts
 
 `quay.io/l-it/modulix-launcher` is an artifact carrier image.
 It is not the nested Podman runtime for automation execution.
