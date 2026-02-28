@@ -18,7 +18,7 @@ For a complete local image build/start workflow, see:
 
 ```bash
 export WORKSPACE_ROOT="$PWD"
-export INVENTORY_DIR="$WORKSPACE_ROOT/ansible-inventory-lit/inventories"
+export INVENTORY_DIR="$WORKSPACE_ROOT/ansible-inventory/inventories"
 export INVENTORY_NAME="<inventory-name>"   # e.g. corp, ...
 export VAULT_PASS_FILE="$WORKSPACE_ROOT/.vault-pass.txt"
 # optional: disable TLS cert verification for image pulls
