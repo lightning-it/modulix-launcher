@@ -1,6 +1,3 @@
-packaging/rpm/.rpmbuild/
-packaging/rpm/dist/
-
 # Docker artefacts
 *.log
 *.tmp
