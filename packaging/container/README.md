@@ -2,6 +2,8 @@
 
 This directory contains helper scripts for building and exporting artifacts from
 the `modulix-launcher` container image.
+The image is an artifact carrier (RPM + launcher binary), not the nested
+automation runtime.
 
 ## Build image
 
