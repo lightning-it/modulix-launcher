@@ -53,13 +53,17 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: "24"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
 
       - name: Run semantic-release
-        run: npx semantic-release
+        run: |
+          npx --yes \
+            --package semantic-release@25 \
+            --package @semantic-release/changelog@6 \
+            --package @semantic-release/commit-analyzer@13 \
+            --package @semantic-release/git@10 \
+            --package @semantic-release/github@12 \
+            --package @semantic-release/release-notes-generator@14 \
+            semantic-release
 
   release_dry_run:
     name: Semantic Release (dry run)
@@ -80,10 +84,14 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: "24"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
 
       - name: Run semantic-release (dry run)
-        run: npx semantic-release --dry-run --no-ci
+        run: |
+          npx --yes \
+            --package semantic-release@25 \
+            --package @semantic-release/changelog@6 \
+            --package @semantic-release/commit-analyzer@13 \
+            --package @semantic-release/git@10 \
+            --package @semantic-release/github@12 \
+            --package @semantic-release/release-notes-generator@14 \
+            semantic-release --dry-run --no-ci
