@@ -1,0 +1,6 @@
+.git
+.github
+.copr
+packaging/rpm/.rpmbuild
+packaging/rpm/dist
+
