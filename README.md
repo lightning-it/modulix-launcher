@@ -103,7 +103,26 @@ Supported `--playbook` forms:
 - `ansible/playbooks/...` (resolved to `/runner/project/ansible/playbooks/...`)
 - `<subpath>.yml` (resolved to `/opt/modulix/ansible/playbooks/<subpath>.yml`)
 
-## RPM Build
+## Operators: Use Published Artifacts
+
+`quay.io/l-it/modulix-launcher` is an artifact carrier image.
+It is not the nested Podman runtime for automation execution.
+Nested execution happens in the toolbox image.
+
+Pull and export artifacts:
+
+```bash
+packaging/container/export-artifacts.sh \
+  --image quay.io/l-it/modulix-launcher:latest \
+  --output-dir ./dist-export
+```
+
+Export result:
+
+- `./dist-export/rpm/*.rpm`
+- `./dist-export/bin/modulix-launcher`
+
+## Maintainers: Build And Publish
 
 Build SRPM:
 
@@ -115,13 +134,7 @@ Install path from RPM:
 
 - `/usr/bin/modulix-launcher`
 
-## Container Build
-
-Build a container image that:
-
-- installs `modulix-launcher` from the generated RPM
-- keeps the RPM inside the image under `/opt/modulix/rpms`
-- exposes `modulix-launcher` under `/usr/local/bin/modulix-launcher`
+Build container image (artifact carrier):
 
 ```bash
 packaging/container/build-image.sh --image localhost/modulix-launcher:local
@@ -141,19 +154,6 @@ packaging/container/push-image.sh \
   --source-image localhost/modulix-launcher:local \
   --target-image quay.io/l-it/modulix-launcher:local
 ```
-
-Pull and export artifacts (for macOS/Ubuntu workflows):
-
-```bash
-packaging/container/export-artifacts.sh \
-  --image quay.io/l-it/modulix-launcher:local \
-  --output-dir ./dist-export
-```
-
-Export result:
-
-- `./dist-export/rpm/*.rpm`
-- `./dist-export/bin/modulix-launcher`
 
 CI workflow for container build/push:
 
