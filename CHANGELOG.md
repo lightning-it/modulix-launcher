@@ -1,3 +1,9 @@
+## [1.0.3](https://github.com/lightning-it/modulix-launcher/compare/v1.0.2...v1.0.3) (2026-03-12)
+
+### Bug Fixes
+
+* normalize shebang ([#12](https://github.com/lightning-it/modulix-launcher/issues/12)) ([1abee51](https://github.com/lightning-it/modulix-launcher/commit/1abee514918e55a6411befb0769ad389026d2320))
+
 ## [1.0.2](https://github.com/lightning-it/modulix-launcher/compare/v1.0.1...v1.0.2) (2026-03-12)
 
 ### Bug Fixes
