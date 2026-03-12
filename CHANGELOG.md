@@ -1,3 +1,9 @@
+## [1.0.1](https://github.com/lightning-it/modulix-launcher/compare/v1.0.0...v1.0.1) (2026-03-12)
+
+### Bug Fixes
+
+* Add renovate.json ([#7](https://github.com/lightning-it/modulix-launcher/issues/7)) ([6d3674e](https://github.com/lightning-it/modulix-launcher/commit/6d3674eb4fc73913667363dfa14d090cd704c6e2))
+
 ## 1.0.0 (2026-02-28)
 
 ### Features
