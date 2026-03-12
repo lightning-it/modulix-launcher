@@ -1,3 +1,9 @@
+## [1.0.2](https://github.com/lightning-it/modulix-launcher/compare/v1.0.1...v1.0.2) (2026-03-12)
+
+### Bug Fixes
+
+* update docker/dockerfile docker tag to v1.22 ([#9](https://github.com/lightning-it/modulix-launcher/issues/9)) ([4eddb35](https://github.com/lightning-it/modulix-launcher/commit/4eddb35f61c58239a283fd791e8224d2dc6f00d0))
+
 ## [1.0.1](https://github.com/lightning-it/modulix-launcher/compare/v1.0.0...v1.0.1) (2026-03-12)
 
 ### Bug Fixes
