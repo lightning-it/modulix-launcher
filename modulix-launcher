@@ -8,6 +8,7 @@ Usage:
   modulix-launcher --inventory-dir <PATH> toolbox shell
 
 Notes:
+  RHEL control hosts only.
   --inventory-dir <PATH> sets the inventories root directory mounted into the runtime.
   -i/--inventory in [ansible args...] selects the concrete Ansible inventory file.
   Execution mode is nested-only with fixed host preload:
@@ -41,8 +42,13 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   exit 0
 fi
 
-PWD_ABS="$(readlink -f -- "$PWD")"
+[[ "$(uname -s)" == "Linux" ]] || die "modulix-launcher is supported only on RHEL control hosts"
+[[ -f /etc/redhat-release ]] || die "modulix-launcher is supported only on RHEL control hosts"
+
+PWD_ABS="$(abs_path "$PWD")"
 INVENTORY_DIR=""
+ANSIBLE_ROOT_HOST="$PWD_ABS/modulix-automation/ansible"
+ANSIBLE_CONFIG_FILE_HOST="$ANSIBLE_ROOT_HOST/ansible.cfg"
 
 case "${1:-}" in
   --inventory-dir)
@@ -73,11 +79,18 @@ case "$INVENTORY_DIR" in
   *) die "--inventory-dir must be inside current directory ($PWD_ABS): $INVENTORY_DIR" ;;
 esac
 [[ -d "$INVENTORY_DIR" ]] || die "--inventory-dir is not a directory: $INVENTORY_DIR"
+[[ -d "$ANSIBLE_ROOT_HOST" ]] || die "current directory must contain modulix-automation/ansible: $ANSIBLE_ROOT_HOST"
+[[ -f "$ANSIBLE_CONFIG_FILE_HOST" && -r "$ANSIBLE_CONFIG_FILE_HOST" ]] || {
+  die "required ansible.cfg missing or unreadable: $ANSIBLE_CONFIG_FILE_HOST"
+}
 
 RUN_EE_IMAGE="${RUN_EE_IMAGE:-quay.io/l-it/ee-wunder-ansible-ubi9-certified:v1.11.6}"
 RUN_TOOLBOX_IMAGE="${RUN_TOOLBOX_IMAGE:-quay.io/l-it/ee-wunder-toolbox-ubi9:v1.7.2}"
-VAULT_PASS_FILE="$(abs_path "${VAULT_PASS_FILE:-$PWD_ABS/.vault-pass.txt}")"
+VAULT_PASS_FILE="$(abs_path "${VAULT_PASS_FILE:-$ANSIBLE_ROOT_HOST/.vault-pass.txt}")"
 RUN_SKIP_CERT_CHECK="${RUN_SKIP_CERT_CHECK:-false}"
+RUN_ANSIBLE_LOCAL_TEMP="${ANSIBLE_LOCAL_TEMP:-/tmp/.ansible/tmp}"
+RUN_ANSIBLE_REMOTE_TEMP="${ANSIBLE_REMOTE_TEMP:-~/.ansible/tmp}"
+RUN_VAULT_TOKEN="${VAULT_TOKEN:-${ROOT_TOKEN:-}}"
 
 case "$RUN_SKIP_CERT_CHECK" in
   true|false) ;;
@@ -94,11 +107,12 @@ esac
 
 RUNNER_INVENTORY_DIR="$(runner_path "$INVENTORY_DIR")"
 RUNNER_VAULT_PASS_FILE="$(runner_path "$VAULT_PASS_FILE")"
-SSH_AUTH_SOCK_HOST=""
+RUNNER_ANSIBLE_CONFIG="$(runner_path "$ANSIBLE_CONFIG_FILE_HOST")"
+RUNNER_ANSIBLE_ROOT="$(runner_path "$ANSIBLE_ROOT_HOST")"
+SSH_SOURCE_HOST=""
 
 ensure_image_available_on_host() {
   local image="$1"
-  local pull_args=()
   if podman image exists "$image" >/dev/null 2>&1; then
     return 0
   fi
@@ -108,28 +122,19 @@ ensure_image_available_on_host() {
   fi
 
   if [[ "$RUN_SKIP_CERT_CHECK" == "true" ]]; then
-    pull_args+=( --tls-verify=false )
+    podman pull --tls-verify=false "$image" >/dev/null
+    return 0
   fi
 
-  podman pull "${pull_args[@]}" "$image" >/dev/null
+  podman pull "$image" >/dev/null
 }
 
-require_ssh_agent() {
-  local candidate=""
-  [[ -n "${SSH_AUTH_SOCK:-}" ]] || die "SSH_AUTH_SOCK is not set. Start ssh-agent and load key(s) with ssh-add."
+discover_ssh_access() {
+  local ssh_source_candidate="$HOME/.ssh"
 
-  candidate="$(readlink -f -- "$SSH_AUTH_SOCK" 2>/dev/null || true)"
-  if [[ -n "$candidate" && -S "$candidate" ]]; then
-    SSH_AUTH_SOCK_HOST="$candidate"
-    return
-  fi
-
-  if [[ -S "$SSH_AUTH_SOCK" ]]; then
-    SSH_AUTH_SOCK_HOST="$SSH_AUTH_SOCK"
-    return
-  fi
-
-  die "SSH_AUTH_SOCK is not a valid socket: $SSH_AUTH_SOCK"
+  [[ -d "$ssh_source_candidate" ]] || die "required SSH directory missing: $ssh_source_candidate"
+  SSH_SOURCE_HOST="$(abs_path "$ssh_source_candidate")"
+  [[ -d "$SSH_SOURCE_HOST" ]] || die "required SSH directory missing: $SSH_SOURCE_HOST"
 }
 
 run_toolbox() {
@@ -148,14 +153,12 @@ run_toolbox() {
     -e ANSIBLE_TOOLBOX_AUTO_COLLECTIONS=false
     -e "ANSIBLE_VAULT_PASSWORD_FILE=$RUNNER_VAULT_PASS_FILE"
     -e "ANSIBLE_NAVIGATOR_EXECUTION_ENVIRONMENT_VOLUME_MOUNTS=$ee_volume_mounts"
+    -e "ANSIBLE_LOCAL_TEMP=$RUN_ANSIBLE_LOCAL_TEMP"
+    -e "ANSIBLE_REMOTE_TEMP=$RUN_ANSIBLE_REMOTE_TEMP"
+    -e ANSIBLE_TOOLBOX_NAV_PULL_POLICY=never
+    -e "ANSIBLE_CONFIG=$RUNNER_ANSIBLE_CONFIG"
   )
-  envs+=( -e ANSIBLE_TOOLBOX_NAV_PULL_POLICY=never )
-  [[ -n "${VAULT_TOKEN:-}" ]] && envs+=( -e "VAULT_TOKEN=${VAULT_TOKEN}" )
-  local socket_mount=()
-  if [[ -n "$SSH_AUTH_SOCK_HOST" ]]; then
-    envs+=( -e "SSH_AUTH_SOCK=$SSH_AUTH_SOCK_HOST" )
-    socket_mount+=( -v "$SSH_AUTH_SOCK_HOST:$SSH_AUTH_SOCK_HOST" )
-  fi
+  [[ -n "$RUN_VAULT_TOKEN" ]] && envs+=( -e "VAULT_TOKEN=${RUN_VAULT_TOKEN}" )
 
   podman run --rm "${tty[@]}" \
     --privileged \
@@ -163,7 +166,8 @@ run_toolbox() {
     --user 0:0 \
     -w /runner/project \
     -v "$PWD_ABS:/runner/project:Z" \
-    "${socket_mount[@]}" \
+    -v "$SSH_SOURCE_HOST:/runner/project/.ssh:ro" \
+    -v "$SSH_SOURCE_HOST:/root/.ssh:ro" \
     "${envs[@]}" \
     "$RUN_TOOLBOX_IMAGE" \
     "$@"
@@ -200,80 +204,104 @@ rewrite_inventory_args() {
   printf '%s\0' "${out[@]}"
 }
 
-run_services() {
+resolve_service_playbook() {
   local service="$1"
-  shift || true
-
-  require_ssh_agent
-
-  local rebuild=false
-  local playbook_override=""
-  local expect_playbook=false
-  local args=()
-  local a
-  for a in "$@"; do
-    if [[ "$expect_playbook" == true ]]; then
-      playbook_override="$a"
-      expect_playbook=false
-      continue
-    fi
-    case "$a" in
-      --rebuild|-r|rebuild) rebuild=true ;;
-      --playbook|-p) expect_playbook=true ;;
-      --playbook=*|-p=*)
-        playbook_override="${a#*=}"
-        [[ -n "$playbook_override" ]] || die "--playbook requires a non-empty value"
-        ;;
-      *) args+=( "$a" ) ;;
-    esac
-  done
-  [[ "$expect_playbook" == false ]] || die "--playbook requires a value"
-
-  local playbook=""
-  case "$service" in
-    wunderbox)
-      if [[ "$rebuild" == true ]]; then
-        playbook="/opt/modulix/ansible/playbooks/services/01-wunderbox-rebuild.yml"
-      else
-        playbook="/opt/modulix/ansible/playbooks/stage-2b/12-wunderbox.yml"
-      fi
-      ;;
-    aap)
-      if [[ "$rebuild" == true ]]; then
-        playbook="/opt/modulix/ansible/playbooks/services/02-aap-rebuild.yml"
-      else
-        playbook="/opt/modulix/ansible/playbooks/stage-2b/13-aap.yml"
-      fi
-      ;;
-    *) die "unsupported service '$service' (use: wunderbox | aap)" ;;
-  esac
+  local rebuild="$2"
+  local playbook_override="${3:-}"
 
   if [[ -n "$playbook_override" ]]; then
     case "$playbook_override" in
-      /*) playbook="$playbook_override" ;;
-      playbooks/*) playbook="/opt/modulix/ansible/$playbook_override" ;;
-      ansible/playbooks/*) playbook="/runner/project/$playbook_override" ;;
-      *.yml|*.yaml) playbook="/opt/modulix/ansible/playbooks/$playbook_override" ;;
-      *) die "invalid --playbook path '$playbook_override' (use absolute path, playbooks/..., ansible/playbooks/..., or <subpath>.yml)" ;;
+      /*) printf '%s\n' "$playbook_override" ;;
+      playbooks/*) printf '%s\n' "${RUNNER_ANSIBLE_ROOT}/$playbook_override" ;;
+      *) die "invalid --playbook path '$playbook_override' (use absolute path or playbooks/...)" ;;
     esac
+    return 0
   fi
 
+  case "${service}:${rebuild}" in
+    wunderbox:true) printf '%s\n' "${RUNNER_ANSIBLE_ROOT}/playbooks/services/01-wunderbox-rebuild.yml" ;;
+    wunderbox:false) printf '%s\n' "${RUNNER_ANSIBLE_ROOT}/playbooks/stage-2b/12-wunderbox.yml" ;;
+    aap:true) printf '%s\n' "${RUNNER_ANSIBLE_ROOT}/playbooks/services/02-aap-rebuild.yml" ;;
+    aap:false) printf '%s\n' "${RUNNER_ANSIBLE_ROOT}/playbooks/stage-2b/13-aap.yml" ;;
+    *) die "unsupported service '$service' (use: wunderbox | aap)" ;;
+  esac
+}
+
+parse_service_args() {
+  SERVICE_REBUILD=false
+  SERVICE_PLAYBOOK_OVERRIDE=""
+  SERVICE_ARGS_INCLUDE_VAULT_TOKEN=false
+  SERVICE_ARGS=()
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --rebuild|-r|rebuild)
+        SERVICE_REBUILD=true
+        ;;
+      --playbook|-p)
+        [[ $# -ge 2 ]] || die "--playbook requires a value"
+        SERVICE_PLAYBOOK_OVERRIDE="$2"
+        shift
+        ;;
+      --playbook=*|-p=*)
+        SERVICE_PLAYBOOK_OVERRIDE="${1#*=}"
+        [[ -n "$SERVICE_PLAYBOOK_OVERRIDE" ]] || die "--playbook requires a non-empty value"
+        ;;
+      -e|--extra-vars)
+        [[ $# -ge 2 ]] || die "--extra-vars requires a value"
+        [[ "$2" == *"vault_token="* ]] && SERVICE_ARGS_INCLUDE_VAULT_TOKEN=true
+        SERVICE_ARGS+=( "$1" "$2" )
+        shift
+        ;;
+      -e=*|--extra-vars=*)
+        [[ "$1" == *"vault_token="* ]] && SERVICE_ARGS_INCLUDE_VAULT_TOKEN=true
+        SERVICE_ARGS+=( "$1" )
+        ;;
+      *)
+        SERVICE_ARGS+=( "$1" )
+        ;;
+    esac
+    shift
+  done
+}
+
+require_service_targets() {
   local has_inventory=false
   local has_limit=false
-  for a in "${args[@]}"; do
+  local a
+
+  for a in "$@"; do
     [[ "$a" == "-i" || "$a" == "--inventory" || "$a" == --inventory=* ]] && has_inventory=true
     [[ "$a" == "-l" || "$a" == "--limit" ]] && has_limit=true
   done
   [[ "$has_inventory" == true ]] || die "services mode requires ansible -i/--inventory <FILE> (separate from top-level --inventory-dir)"
   [[ "$has_limit" == true ]] || die "services mode requires -l/--limit (no environment-specific default host is assumed)"
+}
+
+run_services() {
+  local service="$1"
+  shift || true
+
+  discover_ssh_access
+  parse_service_args "$@"
+
+  if [[ -n "$RUN_VAULT_TOKEN" && "$SERVICE_ARGS_INCLUDE_VAULT_TOKEN" == false ]]; then
+    SERVICE_ARGS+=( -e "vault_token=$RUN_VAULT_TOKEN" )
+  fi
+
+  local playbook=""
+  playbook="$(resolve_service_playbook "$service" "$SERVICE_REBUILD" "$SERVICE_PLAYBOOK_OVERRIDE")"
+  require_service_targets "${SERVICE_ARGS[@]}"
 
   local run_args=()
   while IFS= read -r -d '' a; do
     run_args+=( "$a" )
-  done < <(rewrite_inventory_args "${args[@]}")
+  done < <(rewrite_inventory_args "${SERVICE_ARGS[@]}")
 
-  ensure_image_available_on_host "$RUN_EE_IMAGE"
+  local nav_local="${RUNNER_ANSIBLE_ROOT}/scripts/ansible-nav-local"
+
   ensure_image_available_on_host "$RUN_TOOLBOX_IMAGE"
+  ensure_image_available_on_host "$RUN_EE_IMAGE"
 
   local ee_archive=""
   local runner_ee_archive=""
@@ -290,10 +318,11 @@ run_services() {
   if ! run_toolbox true bash -lc '
     set -euo pipefail
     ee_archive="$1"
-    shift
+    nav_local="$2"
+    shift 2
     podman load -i "$ee_archive" >/dev/null
-    exec ansible-nav-local run "$@"
-  ' -- "$runner_ee_archive" "$playbook" "${run_args[@]}"; then
+    exec "$nav_local" run "$@"
+  ' -- "$runner_ee_archive" "$nav_local" "$playbook" "${run_args[@]}"; then
     rm -f -- "$ee_archive"
     return 1
   fi
@@ -302,35 +331,10 @@ run_services() {
 }
 
 run_toolbox_shell() {
-  require_ssh_agent
+  discover_ssh_access
 
-  ensure_image_available_on_host "$RUN_EE_IMAGE"
   ensure_image_available_on_host "$RUN_TOOLBOX_IMAGE"
-
-  local ee_archive=""
-  local runner_ee_archive=""
-  local cache_dir="$PWD_ABS/.modulix-launcher-cache"
-  mkdir -p -- "$cache_dir"
-  ee_archive="$(mktemp "$cache_dir/run-ee-image.XXXXXX.tar")"
-  runner_ee_archive="$(runner_path "$ee_archive")"
-
-  if ! podman save -o "$ee_archive" "$RUN_EE_IMAGE" >/dev/null; then
-    rm -f -- "$ee_archive"
-    die "failed to export run EE image from host store: $RUN_EE_IMAGE"
-  fi
-
-  if ! run_toolbox true bash -lc '
-    set -euo pipefail
-    ee_archive="$1"
-    shift
-    podman load -i "$ee_archive" >/dev/null
-    exec /bin/bash
-  ' -- "$runner_ee_archive"; then
-    rm -f -- "$ee_archive"
-    return 1
-  fi
-
-  rm -f -- "$ee_archive"
+  run_toolbox true /bin/bash
 }
 
 mode="${1:-}"

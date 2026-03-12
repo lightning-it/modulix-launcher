@@ -4,7 +4,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
 
-engine="${CONTAINER_ENGINE:-podman}"
 image="${MODULIX_LAUNCHER_IMAGE:-localhost/modulix-launcher:local}"
 containerfile="${MODULIX_LAUNCHER_CONTAINERFILE:-${REPO_ROOT}/Containerfile}"
 
@@ -17,7 +16,6 @@ Usage:
 
 Options:
   --image <name:tag>        Image name (default: localhost/modulix-launcher:local)
-  --engine <podman|docker>  Container engine (default: podman)
   --containerfile <path>    Containerfile path (default: ./Containerfile)
   -h, --help                Show help
 EOF
@@ -27,10 +25,6 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --image)
       image="${2:?missing value for --image}"
-      shift 2
-      ;;
-    --engine)
-      engine="${2:?missing value for --engine}"
       shift 2
       ;;
     --containerfile)
@@ -49,8 +43,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if ! command -v "${engine}" >/dev/null 2>&1; then
-  echo "Container engine not found: ${engine}" >&2
+if ! command -v podman >/dev/null 2>&1; then
+  echo "Container engine not found: podman" >&2
   exit 1
 fi
 
@@ -63,10 +57,9 @@ if [[ ! -f "${containerfile}" ]]; then
   exit 1
 fi
 
-"${engine}" build \
+podman build \
   --file "${containerfile}" \
   --tag "${image}" \
   "${REPO_ROOT}"
 
 echo "Built image: ${image}"
-
