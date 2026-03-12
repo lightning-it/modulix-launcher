@@ -67,5 +67,17 @@ trap cleanup EXIT
 "${engine}" cp "${cid}:/usr/local/bin/modulix-launcher" "${output_dir}/bin/modulix-launcher"
 chmod 0755 "${output_dir}/bin/modulix-launcher"
 
-echo "Exported artifacts to: ${output_dir}"
+# RPM-installed script shebangs may be rewritten to /usr/bin/bash on Linux.
+# Normalize the exported standalone launcher back to a portable env shebang
+# so it can be installed on macOS hosts for local development.
+if [[ "$(head -n 1 "${output_dir}/bin/modulix-launcher" || true)" == "#!/usr/bin/bash" ]]; then
+  tmp_launcher="${output_dir}/bin/modulix-launcher.tmp"
+  {
+    printf '%s\n' '#!/usr/bin/env bash'
+    tail -n +2 "${output_dir}/bin/modulix-launcher"
+  } > "${tmp_launcher}"
+  chmod 0755 "${tmp_launcher}"
+  mv "${tmp_launcher}" "${output_dir}/bin/modulix-launcher"
+fi
 
+echo "Exported artifacts to: ${output_dir}"

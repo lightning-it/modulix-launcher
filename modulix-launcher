@@ -23,7 +23,23 @@ die() {
 abs_path() {
   local p="$1"
   [[ "$p" == /* ]] || p="$PWD/$p"
-  readlink -f -- "$p"
+
+  if command -v realpath >/dev/null 2>&1; then
+    realpath "$p"
+    return
+  fi
+
+  if readlink -f / >/dev/null 2>&1; then
+    readlink -f -- "$p"
+    return
+  fi
+
+  perl -MCwd=realpath -e '
+    my $path = shift;
+    my $resolved = realpath($path);
+    exit 1 unless defined $resolved;
+    print $resolved;
+  ' "$p"
 }
 
 runner_path() {
@@ -41,7 +57,7 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   exit 0
 fi
 
-PWD_ABS="$(readlink -f -- "$PWD")"
+PWD_ABS="$(abs_path "$PWD")"
 INVENTORY_DIR=""
 
 case "${1:-}" in
@@ -78,11 +94,32 @@ RUN_EE_IMAGE="${RUN_EE_IMAGE:-quay.io/l-it/ee-wunder-ansible-ubi9-certified:v1.1
 RUN_TOOLBOX_IMAGE="${RUN_TOOLBOX_IMAGE:-quay.io/l-it/ee-wunder-toolbox-ubi9:v1.7.2}"
 VAULT_PASS_FILE="$(abs_path "${VAULT_PASS_FILE:-$PWD_ABS/.vault-pass.txt}")"
 RUN_SKIP_CERT_CHECK="${RUN_SKIP_CERT_CHECK:-false}"
+RUN_ANSIBLE_LOCAL_TEMP="${ANSIBLE_LOCAL_TEMP:-/tmp/.ansible/tmp}"
+RUN_ANSIBLE_REMOTE_TEMP="${ANSIBLE_REMOTE_TEMP:-~/.ansible/tmp}"
+ANSIBLE_CONFIG_FILE_HOST=""
 
 case "$RUN_SKIP_CERT_CHECK" in
   true|false) ;;
   *) die "RUN_SKIP_CERT_CHECK must be true or false (got: $RUN_SKIP_CERT_CHECK)" ;;
 esac
+
+if [[ -n "${ANSIBLE_CONFIG:-}" ]]; then
+  ANSIBLE_CONFIG_FILE_HOST="$(abs_path "$ANSIBLE_CONFIG")"
+elif [[ -f "$PWD_ABS/modulix-automation/ansible/ansible.cfg" ]]; then
+  ANSIBLE_CONFIG_FILE_HOST="$PWD_ABS/modulix-automation/ansible/ansible.cfg"
+elif [[ -f "$PWD_ABS/ansible.cfg" ]]; then
+  ANSIBLE_CONFIG_FILE_HOST="$PWD_ABS/ansible.cfg"
+fi
+
+if [[ -n "$ANSIBLE_CONFIG_FILE_HOST" ]]; then
+  case "$ANSIBLE_CONFIG_FILE_HOST" in
+    "$PWD_ABS"|"$PWD_ABS"/*) ;;
+    *) die "ANSIBLE_CONFIG must be inside current directory ($PWD_ABS): $ANSIBLE_CONFIG_FILE_HOST" ;;
+  esac
+  [[ -f "$ANSIBLE_CONFIG_FILE_HOST" && -r "$ANSIBLE_CONFIG_FILE_HOST" ]] || {
+    die "required ANSIBLE_CONFIG missing or unreadable: $ANSIBLE_CONFIG_FILE_HOST"
+  }
+fi
 
 case "$VAULT_PASS_FILE" in
   "$PWD_ABS"|"$PWD_ABS"/*) ;;
@@ -94,6 +131,10 @@ esac
 
 RUNNER_INVENTORY_DIR="$(runner_path "$INVENTORY_DIR")"
 RUNNER_VAULT_PASS_FILE="$(runner_path "$VAULT_PASS_FILE")"
+RUNNER_ANSIBLE_CONFIG=""
+if [[ -n "$ANSIBLE_CONFIG_FILE_HOST" ]]; then
+  RUNNER_ANSIBLE_CONFIG="$(runner_path "$ANSIBLE_CONFIG_FILE_HOST")"
+fi
 SSH_AUTH_SOCK_HOST=""
 
 ensure_image_available_on_host() {
@@ -111,14 +152,18 @@ ensure_image_available_on_host() {
     pull_args+=( --tls-verify=false )
   fi
 
-  podman pull "${pull_args[@]}" "$image" >/dev/null
+  if [[ ${#pull_args[@]} -gt 0 ]]; then
+    podman pull "${pull_args[@]}" "$image" >/dev/null
+  else
+    podman pull "$image" >/dev/null
+  fi
 }
 
 require_ssh_agent() {
   local candidate=""
   [[ -n "${SSH_AUTH_SOCK:-}" ]] || die "SSH_AUTH_SOCK is not set. Start ssh-agent and load key(s) with ssh-add."
 
-  candidate="$(readlink -f -- "$SSH_AUTH_SOCK" 2>/dev/null || true)"
+  candidate="$(abs_path "$SSH_AUTH_SOCK" 2>/dev/null || true)"
   if [[ -n "$candidate" && -S "$candidate" ]]; then
     SSH_AUTH_SOCK_HOST="$candidate"
     return
@@ -126,10 +171,23 @@ require_ssh_agent() {
 
   if [[ -S "$SSH_AUTH_SOCK" ]]; then
     SSH_AUTH_SOCK_HOST="$SSH_AUTH_SOCK"
-    return
+  else
+    die "SSH_AUTH_SOCK is not a valid socket: $SSH_AUTH_SOCK"
   fi
 
-  die "SSH_AUTH_SOCK is not a valid socket: $SSH_AUTH_SOCK"
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    case "$SSH_AUTH_SOCK_HOST" in
+      /private/tmp/com.apple.launchd/*|/tmp/com.apple.launchd/*)
+        die "macOS launchd SSH_AUTH_SOCK cannot be mounted into toolbox runtime: $SSH_AUTH_SOCK_HOST
+Create a dedicated agent socket on a normal filesystem path and export it first, for example:
+  mkdir -p \"\$HOME/.ssh\"
+  rm -f \"\$HOME/.ssh/modulix-agent.sock\"
+  eval \"\$(ssh-agent -a \"\$HOME/.ssh/modulix-agent.sock\")\"
+  ssh-add
+  export SSH_AUTH_SOCK=\"\$HOME/.ssh/modulix-agent.sock\""
+        ;;
+    esac
+  fi
 }
 
 run_toolbox() {
@@ -148,8 +206,13 @@ run_toolbox() {
     -e ANSIBLE_TOOLBOX_AUTO_COLLECTIONS=false
     -e "ANSIBLE_VAULT_PASSWORD_FILE=$RUNNER_VAULT_PASS_FILE"
     -e "ANSIBLE_NAVIGATOR_EXECUTION_ENVIRONMENT_VOLUME_MOUNTS=$ee_volume_mounts"
+    -e "ANSIBLE_LOCAL_TEMP=$RUN_ANSIBLE_LOCAL_TEMP"
+    -e "ANSIBLE_REMOTE_TEMP=$RUN_ANSIBLE_REMOTE_TEMP"
   )
   envs+=( -e ANSIBLE_TOOLBOX_NAV_PULL_POLICY=never )
+  if [[ -n "$RUNNER_ANSIBLE_CONFIG" ]]; then
+    envs+=( -e "ANSIBLE_CONFIG=$RUNNER_ANSIBLE_CONFIG" )
+  fi
   [[ -n "${VAULT_TOKEN:-}" ]] && envs+=( -e "VAULT_TOKEN=${VAULT_TOKEN}" )
   local socket_mount=()
   if [[ -n "$SSH_AUTH_SOCK_HOST" ]]; then
