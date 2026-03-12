@@ -3,8 +3,10 @@
 ## Overview
 
 Use `modulix-launcher` to run Modulix automation playbooks from published container images.
+RHEL control hosts only.
+Run it from the workspace root that contains `modulix-automation/ansible` and the inventory repo.
 It mounts the current directory as the runtime workspace.
-It uses an inventory, a Vault password file, an SSH agent, and host Podman login state.
+It uses an inventory, a Vault password file, `~/.ssh`, and host Podman login state.
 
 ## Preparation
 
@@ -18,9 +20,9 @@ For a complete local image build/start workflow, see:
 
 ```bash
 export WORKSPACE_ROOT="$PWD"
-export INVENTORY_DIR="$WORKSPACE_ROOT/ansible-inventory/inventories"
+export INVENTORY_DIR="$WORKSPACE_ROOT/ansible-inventory-lit/inventories"
 export INVENTORY_NAME="<inventory-name>"   # e.g. corp, ...
-export VAULT_PASS_FILE="$WORKSPACE_ROOT/.vault-pass.txt"
+export VAULT_PASS_FILE="$WORKSPACE_ROOT/modulix-automation/ansible/.vault-pass.txt"
 # optional: disable TLS cert verification for image pulls
 export RUN_SKIP_CERT_CHECK=false
 [[ -s "$VAULT_PASS_FILE" ]] || { echo "ERROR: missing or empty Vault password file: $VAULT_PASS_FILE" >&2; false; }
@@ -43,13 +45,6 @@ podman pull "$RUN_TOOLBOX_IMAGE"
 
 If an image registry requires authentication, you must log in on the host first (`podman login <registry>`).
 `modulix-launcher` does not perform registry login and does not manage auth files.
-
-```bash
-# required for SSH: forward your running ssh-agent
-test -n "$SSH_AUTH_SOCK"
-test -S "$SSH_AUTH_SOCK"
-ssh-add -L
-```
 
 Optional for Vault-backed workflows:
 if `VAULT_TOKEN` is set on the host, `modulix-launcher` forwards it into toolbox/EE.
@@ -99,9 +94,7 @@ modulix-launcher --inventory-dir "$INVENTORY_DIR" services wunderbox \
 
 Supported `--playbook` forms:
 - absolute path (for example `/opt/modulix/ansible/playbooks/services/12-wunderbox-service-stack.yml`)
-- `playbooks/...` (resolved to `/opt/modulix/ansible/playbooks/...`)
-- `ansible/playbooks/...` (resolved to `/runner/project/ansible/playbooks/...`)
-- `<subpath>.yml` (resolved to `/opt/modulix/ansible/playbooks/<subpath>.yml`)
+- `playbooks/...` (resolved to `/runner/project/modulix-automation/ansible/playbooks/...`)
 
 ## Operators: Use Published Artifacts
 
@@ -124,6 +117,8 @@ Export result:
 
 ## Maintainers: Build And Publish
 
+Builds use `podman`.
+
 Build SRPM:
 
 ```bash
@@ -138,12 +133,6 @@ Build container image (artifact carrier):
 
 ```bash
 packaging/container/build-image.sh --image localhost/modulix-launcher:local
-```
-
-If Podman socket is unavailable locally:
-
-```bash
-packaging/container/build-image.sh --engine docker --image modulix-launcher:local
 ```
 
 Push image (example):

@@ -7,14 +7,10 @@ automation runtime.
 
 ## Build image
 
+Builds use `podman`.
+
 ```bash
 packaging/container/build-image.sh --image localhost/modulix-launcher:local
-```
-
-If Podman socket is unavailable on your host:
-
-```bash
-packaging/container/build-image.sh --engine docker --image modulix-launcher:local
 ```
 
 ## Push image
