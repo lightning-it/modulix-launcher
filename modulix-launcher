@@ -110,6 +110,7 @@ RUNNER_VAULT_PASS_FILE="$(runner_path "$VAULT_PASS_FILE")"
 RUNNER_ANSIBLE_CONFIG="$(runner_path "$ANSIBLE_CONFIG_FILE_HOST")"
 RUNNER_ANSIBLE_ROOT="$(runner_path "$ANSIBLE_ROOT_HOST")"
 SSH_SOURCE_HOST=""
+SSH_AGENT_SOCKET_HOST=""
 
 ensure_image_available_on_host() {
   local image="$1"
@@ -135,6 +136,30 @@ discover_ssh_access() {
   [[ -d "$ssh_source_candidate" ]] || die "required SSH directory missing: $ssh_source_candidate"
   SSH_SOURCE_HOST="$(abs_path "$ssh_source_candidate")"
   [[ -d "$SSH_SOURCE_HOST" ]] || die "required SSH directory missing: $SSH_SOURCE_HOST"
+
+  if ssh_agent_socket="$(find_ssh_agent_socket)"; then
+    SSH_AGENT_SOCKET_HOST="$ssh_agent_socket"
+  fi
+}
+
+find_ssh_agent_socket() {
+  local from_env="${SSH_AUTH_SOCK:-}"
+  local resolved=""
+
+  [[ -n "$from_env" ]] || return 1
+
+  resolved="$(readlink -f -- "$from_env" 2>/dev/null || true)"
+  if [[ -n "$resolved" && -S "$resolved" ]]; then
+    echo "$resolved"
+    return 0
+  fi
+
+  if [[ -S "$from_env" ]]; then
+    echo "$from_env"
+    return 0
+  fi
+
+  return 1
 }
 
 run_toolbox() {
@@ -144,6 +169,11 @@ run_toolbox() {
   local tty=()
   [[ "$interactive" == true ]] && tty=( -it )
   local ee_volume_mounts="${ANSIBLE_NAVIGATOR_EXECUTION_ENVIRONMENT_VOLUME_MOUNTS:-/opt/modulix:/opt/modulix:Z}"
+  local mounts=(
+    -v "$PWD_ABS:/runner/project:Z"
+    -v "$SSH_SOURCE_HOST:/runner/project/.ssh:ro"
+    -v "$SSH_SOURCE_HOST:/root/.ssh:ro"
+  )
 
   local envs=(
     -e HOME=/runner/project
@@ -159,15 +189,17 @@ run_toolbox() {
     -e "ANSIBLE_CONFIG=$RUNNER_ANSIBLE_CONFIG"
   )
   [[ -n "$RUN_VAULT_TOKEN" ]] && envs+=( -e "VAULT_TOKEN=${RUN_VAULT_TOKEN}" )
+  if [[ -n "$SSH_AGENT_SOCKET_HOST" ]]; then
+    mounts+=( -v "$SSH_AGENT_SOCKET_HOST:/runner/ssh-agent.sock" )
+    envs+=( -e "SSH_AUTH_SOCK=/runner/ssh-agent.sock" )
+  fi
 
   podman run --rm "${tty[@]}" \
     --privileged \
     --security-opt label=disable \
     --user 0:0 \
     -w /runner/project \
-    -v "$PWD_ABS:/runner/project:Z" \
-    -v "$SSH_SOURCE_HOST:/runner/project/.ssh:ro" \
-    -v "$SSH_SOURCE_HOST:/root/.ssh:ro" \
+    "${mounts[@]}" \
     "${envs[@]}" \
     "$RUN_TOOLBOX_IMAGE" \
     "$@"
