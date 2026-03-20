@@ -185,7 +185,8 @@ find_ssh_agent_socket() {
 
 run_toolbox() {
   local interactive="$1"
-  shift
+  local forward_ssh_agent="${2:-true}"
+  shift 2 || true
 
   local tty=()
   [[ "$interactive" == true ]] && tty=( -it )
@@ -210,7 +211,7 @@ run_toolbox() {
     -e "ANSIBLE_CONFIG=$RUNNER_ANSIBLE_CONFIG"
   )
   [[ -n "$RUN_VAULT_TOKEN" ]] && envs+=( -e "VAULT_TOKEN=${RUN_VAULT_TOKEN}" )
-  if [[ -n "$SSH_AGENT_SOCKET_HOST" ]]; then
+  if [[ "$forward_ssh_agent" == true && -n "$SSH_AGENT_SOCKET_HOST" ]]; then
     mounts+=( -v "$SSH_AGENT_SOCKET_HOST:/runner/ssh-agent.sock" )
     envs+=( -e "SSH_AUTH_SOCK=/runner/ssh-agent.sock" )
   fi
@@ -368,7 +369,7 @@ run_services() {
     die "failed to export run EE image from host store: $RUN_EE_IMAGE"
   fi
 
-  if ! run_toolbox true bash -lc '
+  if ! run_toolbox true false bash -lc '
     set -euo pipefail
     ee_archive="$1"
     nav_local="$2"
@@ -387,7 +388,7 @@ run_toolbox_shell() {
   discover_ssh_access
 
   ensure_image_available_on_host "$RUN_TOOLBOX_IMAGE"
-  run_toolbox true /bin/bash
+  run_toolbox true true /bin/bash
 }
 
 mode="${1:-}"
