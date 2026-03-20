@@ -90,7 +90,7 @@ VAULT_PASS_FILE="$(abs_path "${VAULT_PASS_FILE:-$ANSIBLE_ROOT_HOST/.vault-pass.t
 RUN_SKIP_CERT_CHECK="${RUN_SKIP_CERT_CHECK:-false}"
 RUN_ANSIBLE_LOCAL_TEMP="${ANSIBLE_LOCAL_TEMP:-/tmp/.ansible/tmp}"
 RUN_ANSIBLE_REMOTE_TEMP="${ANSIBLE_REMOTE_TEMP:-~/.ansible/tmp}"
-RUN_VAULT_TOKEN="${VAULT_TOKEN:-${ROOT_TOKEN:-}}"
+RUN_VAULT_TOKEN=""
 
 case "$RUN_SKIP_CERT_CHECK" in
   true|false) ;;
@@ -111,6 +111,23 @@ RUNNER_ANSIBLE_CONFIG="$(runner_path "$ANSIBLE_CONFIG_FILE_HOST")"
 RUNNER_ANSIBLE_ROOT="$(runner_path "$ANSIBLE_ROOT_HOST")"
 SSH_SOURCE_HOST=""
 SSH_AGENT_SOCKET_HOST=""
+
+resolve_vault_token() {
+  local token="${VAULT_TOKEN:-${ROOT_TOKEN:-}}"
+  local token_file="${HOME}/.vault-token"
+
+  if [[ -n "$token" ]]; then
+    printf '%s\n' "$token"
+    return 0
+  fi
+
+  if [[ -r "$token_file" && -s "$token_file" ]]; then
+    head -n 1 -- "$token_file"
+    return 0
+  fi
+
+  return 1
+}
 
 ensure_image_available_on_host() {
   local image="$1"
@@ -141,6 +158,10 @@ discover_ssh_access() {
     SSH_AGENT_SOCKET_HOST="$ssh_agent_socket"
   fi
 }
+
+if run_vault_token="$(resolve_vault_token)"; then
+  RUN_VAULT_TOKEN="$run_vault_token"
+fi
 
 find_ssh_agent_socket() {
   local from_env="${SSH_AUTH_SOCK:-}"
