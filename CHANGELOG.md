@@ -1,3 +1,9 @@
+## [1.1.0](https://github.com/lightning-it/modulix-launcher/compare/v1.0.3...v1.1.0) (2026-03-21)
+
+### Features
+
+* ssh agent expanded ([#15](https://github.com/lightning-it/modulix-launcher/issues/15)) ([bb7ee71](https://github.com/lightning-it/modulix-launcher/commit/bb7ee718d6cb4c33d47f67fb9778f3442127e0d9))
+
 ## [1.0.3](https://github.com/lightning-it/modulix-launcher/compare/v1.0.2...v1.0.3) (2026-03-12)
 
 ### Bug Fixes
