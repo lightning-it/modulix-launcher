@@ -90,7 +90,7 @@ VAULT_PASS_FILE="$(abs_path "${VAULT_PASS_FILE:-$ANSIBLE_ROOT_HOST/.vault-pass.t
 RUN_SKIP_CERT_CHECK="${RUN_SKIP_CERT_CHECK:-false}"
 RUN_ANSIBLE_LOCAL_TEMP="${ANSIBLE_LOCAL_TEMP:-/tmp/.ansible/tmp}"
 RUN_ANSIBLE_REMOTE_TEMP="${ANSIBLE_REMOTE_TEMP:-~/.ansible/tmp}"
-RUN_VAULT_TOKEN="${VAULT_TOKEN:-${ROOT_TOKEN:-}}"
+RUN_VAULT_TOKEN=""
 
 case "$RUN_SKIP_CERT_CHECK" in
   true|false) ;;
@@ -110,6 +110,24 @@ RUNNER_VAULT_PASS_FILE="$(runner_path "$VAULT_PASS_FILE")"
 RUNNER_ANSIBLE_CONFIG="$(runner_path "$ANSIBLE_CONFIG_FILE_HOST")"
 RUNNER_ANSIBLE_ROOT="$(runner_path "$ANSIBLE_ROOT_HOST")"
 SSH_SOURCE_HOST=""
+SSH_AGENT_SOCKET_HOST=""
+
+resolve_vault_token() {
+  local token="${VAULT_TOKEN:-${ROOT_TOKEN:-}}"
+  local token_file="${HOME}/.vault-token"
+
+  if [[ -n "$token" ]]; then
+    printf '%s\n' "$token"
+    return 0
+  fi
+
+  if [[ -r "$token_file" && -s "$token_file" ]]; then
+    head -n 1 -- "$token_file"
+    return 0
+  fi
+
+  return 1
+}
 
 ensure_image_available_on_host() {
   local image="$1"
@@ -135,15 +153,49 @@ discover_ssh_access() {
   [[ -d "$ssh_source_candidate" ]] || die "required SSH directory missing: $ssh_source_candidate"
   SSH_SOURCE_HOST="$(abs_path "$ssh_source_candidate")"
   [[ -d "$SSH_SOURCE_HOST" ]] || die "required SSH directory missing: $SSH_SOURCE_HOST"
+
+  if ssh_agent_socket="$(find_ssh_agent_socket)"; then
+    SSH_AGENT_SOCKET_HOST="$ssh_agent_socket"
+  fi
+}
+
+if run_vault_token="$(resolve_vault_token)"; then
+  RUN_VAULT_TOKEN="$run_vault_token"
+fi
+
+find_ssh_agent_socket() {
+  local from_env="${SSH_AUTH_SOCK:-}"
+  local resolved=""
+
+  [[ -n "$from_env" ]] || return 1
+
+  resolved="$(readlink -f -- "$from_env" 2>/dev/null || true)"
+  if [[ -n "$resolved" && -S "$resolved" ]]; then
+    echo "$resolved"
+    return 0
+  fi
+
+  if [[ -S "$from_env" ]]; then
+    echo "$from_env"
+    return 0
+  fi
+
+  return 1
 }
 
 run_toolbox() {
   local interactive="$1"
-  shift
+  local forward_ssh_agent="${2:-true}"
+  shift 2 || true
 
   local tty=()
   [[ "$interactive" == true ]] && tty=( -it )
   local ee_volume_mounts="${ANSIBLE_NAVIGATOR_EXECUTION_ENVIRONMENT_VOLUME_MOUNTS:-/opt/modulix:/opt/modulix:Z}"
+  local mounts=(
+    -v "$PWD_ABS:/runner/project:Z"
+    -v "$SSH_SOURCE_HOST:/runner/project/.ssh:ro"
+    -v "$SSH_SOURCE_HOST:/root/.ssh:ro"
+  )
 
   local envs=(
     -e HOME=/runner/project
@@ -159,15 +211,17 @@ run_toolbox() {
     -e "ANSIBLE_CONFIG=$RUNNER_ANSIBLE_CONFIG"
   )
   [[ -n "$RUN_VAULT_TOKEN" ]] && envs+=( -e "VAULT_TOKEN=${RUN_VAULT_TOKEN}" )
+  if [[ "$forward_ssh_agent" == true && -n "$SSH_AGENT_SOCKET_HOST" ]]; then
+    mounts+=( -v "$SSH_AGENT_SOCKET_HOST:/runner/ssh-agent.sock" )
+    envs+=( -e "SSH_AUTH_SOCK=/runner/ssh-agent.sock" )
+  fi
 
   podman run --rm "${tty[@]}" \
     --privileged \
     --security-opt label=disable \
     --user 0:0 \
     -w /runner/project \
-    -v "$PWD_ABS:/runner/project:Z" \
-    -v "$SSH_SOURCE_HOST:/runner/project/.ssh:ro" \
-    -v "$SSH_SOURCE_HOST:/root/.ssh:ro" \
+    "${mounts[@]}" \
     "${envs[@]}" \
     "$RUN_TOOLBOX_IMAGE" \
     "$@"
@@ -315,7 +369,7 @@ run_services() {
     die "failed to export run EE image from host store: $RUN_EE_IMAGE"
   fi
 
-  if ! run_toolbox true bash -lc '
+  if ! run_toolbox true false bash -lc '
     set -euo pipefail
     ee_archive="$1"
     nav_local="$2"
@@ -334,7 +388,7 @@ run_toolbox_shell() {
   discover_ssh_access
 
   ensure_image_available_on_host "$RUN_TOOLBOX_IMAGE"
-  run_toolbox true /bin/bash
+  run_toolbox true true /bin/bash
 }
 
 mode="${1:-}"

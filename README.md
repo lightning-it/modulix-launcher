@@ -46,6 +46,10 @@ podman pull "$RUN_TOOLBOX_IMAGE"
 If an image registry requires authentication, you must log in on the host first (`podman login <registry>`).
 `modulix-launcher` does not perform registry login and does not manage auth files.
 
+If `SSH_AUTH_SOCK` is set on the host and points to a valid socket,
+`modulix-launcher` forwards that agent into toolbox/EE.
+If it is unset or invalid, the runtime falls back to the mounted `~/.ssh` material only.
+
 Optional for Vault-backed workflows:
 if `VAULT_TOKEN` is set on the host, `modulix-launcher` forwards it into toolbox/EE.
 If it is unset, nothing is forwarded.
