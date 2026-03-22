@@ -4,12 +4,16 @@ set -euo pipefail
 usage() {
   cat <<'USAGE'
 Usage:
-  modulix-launcher --inventory-dir <PATH> services <wunderbox|aap> [--rebuild] [--playbook <PATH>] [ansible args...]
-  modulix-launcher --inventory-dir <PATH> toolbox shell
+  modulix-launcher [--runtime-mode <auto|workspace|packaged>] --inventory-dir <PATH> services <wunderbox|aap> [--rebuild] [--playbook <PATH>] [ansible args...]
+  modulix-launcher [--runtime-mode <auto|workspace|packaged>] --inventory-dir <PATH> toolbox shell
 
 Notes:
   RHEL control hosts only.
   --inventory-dir <PATH> sets the inventories root directory mounted into the runtime.
+  --runtime-mode chooses between:
+    auto       prefer ./modulix-automation/ansible when present, otherwise use packaged runtime
+    workspace  require ./modulix-automation/ansible in the current directory
+    packaged   use /opt/modulix/ansible from the toolbox image
   -i/--inventory in [ansible args...] selects the concrete Ansible inventory file.
   Execution mode is nested-only with fixed host preload:
   host always exports RUN_EE_IMAGE and toolbox always loads it before run.
@@ -37,6 +41,22 @@ runner_path() {
   esac
 }
 
+host_or_container_path() {
+  local p="$1"
+  case "$p" in
+    "$PWD_ABS"|"$PWD_ABS"/*) runner_path "$p" ;;
+    /*) printf '%s\n' "$p" ;;
+    *) die "invalid absolute path '$p'" ;;
+  esac
+}
+
+validate_runtime_mode() {
+  case "$1" in
+    auto|workspace|packaged) ;;
+    *) die "invalid --runtime-mode '$1' (use: auto | workspace | packaged)" ;;
+  esac
+}
+
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   usage
   exit 0
@@ -47,70 +67,101 @@ fi
 
 PWD_ABS="$(abs_path "$PWD")"
 INVENTORY_DIR=""
-ANSIBLE_ROOT_HOST="$PWD_ABS/modulix-automation/ansible"
-ANSIBLE_CONFIG_FILE_HOST="$ANSIBLE_ROOT_HOST/ansible.cfg"
+RUNTIME_MODE="${MODULIX_LAUNCHER_RUNTIME_MODE:-auto}"
 
-case "${1:-}" in
-  --inventory-dir)
-    [[ -n "${2:-}" ]] || {
+while [[ $# -gt 0 ]]; do
+  case "${1:-}" in
+    --runtime-mode)
+      [[ -n "${2:-}" ]] || die "--runtime-mode requires a value"
+      RUNTIME_MODE="$2"
+      shift 2
+      ;;
+    --runtime-mode=*)
+      RUNTIME_MODE="${1#*=}"
+      shift
+      ;;
+    --inventory-dir)
+      [[ -n "${2:-}" ]] || die "--inventory-dir requires a value"
+      INVENTORY_DIR="$(abs_path "$2")"
+      shift 2
+      ;;
+    --inventory-dir=*)
+      INVENTORY_DIR="$(abs_path "${1#*=}")"
+      shift
+      ;;
+    services|toolbox)
+      break
+      ;;
+    *)
       usage
-      die "missing required ${1} <PATH>"
-    }
-    INVENTORY_DIR="$(abs_path "$2")"
-    shift 2
-    ;;
-  --inventory-dir=*)
-    local_inv="${1#*=}"
-    [[ -n "$local_inv" ]] || {
-      usage
-      die "${1%%=*} requires a non-empty value"
-    }
-    INVENTORY_DIR="$(abs_path "$local_inv")"
-    shift
-    ;;
-  *)
-    usage
-    die "missing required --inventory-dir <PATH>"
-    ;;
-esac
+      die "unsupported or misplaced argument '$1' before mode selection"
+      ;;
+  esac
+done
 
-case "$INVENTORY_DIR" in
-  "$PWD_ABS"|"$PWD_ABS"/*) ;;
-  *) die "--inventory-dir must be inside current directory ($PWD_ABS): $INVENTORY_DIR" ;;
-esac
-[[ -d "$INVENTORY_DIR" ]] || die "--inventory-dir is not a directory: $INVENTORY_DIR"
-[[ -d "$ANSIBLE_ROOT_HOST" ]] || die "current directory must contain modulix-automation/ansible: $ANSIBLE_ROOT_HOST"
-[[ -f "$ANSIBLE_CONFIG_FILE_HOST" && -r "$ANSIBLE_CONFIG_FILE_HOST" ]] || {
-  die "required ansible.cfg missing or unreadable: $ANSIBLE_CONFIG_FILE_HOST"
+validate_runtime_mode "$RUNTIME_MODE"
+[[ -n "$INVENTORY_DIR" ]] || {
+  usage
+  die "missing required --inventory-dir <PATH>"
 }
+[[ -d "$INVENTORY_DIR" ]] || die "--inventory-dir is not a directory: $INVENTORY_DIR"
+
+WORKSPACE_ANSIBLE_ROOT_HOST="$PWD_ABS/modulix-automation/ansible"
+WORKSPACE_ANSIBLE_CONFIG_HOST="$WORKSPACE_ANSIBLE_ROOT_HOST/ansible.cfg"
+
+ACTIVE_RUNTIME_MODE="$RUNTIME_MODE"
+if [[ "$ACTIVE_RUNTIME_MODE" == "auto" ]]; then
+  if [[ -d "$WORKSPACE_ANSIBLE_ROOT_HOST" && -f "$WORKSPACE_ANSIBLE_CONFIG_HOST" && -r "$WORKSPACE_ANSIBLE_CONFIG_HOST" ]]; then
+    ACTIVE_RUNTIME_MODE="workspace"
+  else
+    ACTIVE_RUNTIME_MODE="packaged"
+  fi
+fi
+
+CONTAINER_INVENTORY_DIR="/opt/modulix/ansible/inventories"
+CONTAINER_VAULT_PASS_FILE="/opt/modulix/ansible/.vault-pass.txt"
+
+case "$ACTIVE_RUNTIME_MODE" in
+  workspace)
+    [[ -d "$WORKSPACE_ANSIBLE_ROOT_HOST" ]] || die "workspace mode requires modulix-automation/ansible: $WORKSPACE_ANSIBLE_ROOT_HOST"
+    [[ -f "$WORKSPACE_ANSIBLE_CONFIG_HOST" && -r "$WORKSPACE_ANSIBLE_CONFIG_HOST" ]] || {
+      die "workspace mode requires ansible.cfg: $WORKSPACE_ANSIBLE_CONFIG_HOST"
+    }
+    CONTAINER_ANSIBLE_ROOT="/runner/project/modulix-automation/ansible"
+    CONTAINER_ANSIBLE_CONFIG="$CONTAINER_ANSIBLE_ROOT/ansible.cfg"
+    CONTAINER_NAV_LOCAL="$CONTAINER_ANSIBLE_ROOT/scripts/ansible-nav-local"
+    TOOLBOX_WORKDIR="/runner/project"
+    TOOLBOX_HOME="/runner/project"
+    DEFAULT_VAULT_PASS_FILE="$WORKSPACE_ANSIBLE_ROOT_HOST/.vault-pass.txt"
+    ;;
+  packaged)
+    CONTAINER_ANSIBLE_ROOT="/opt/modulix/ansible"
+    CONTAINER_ANSIBLE_CONFIG="$CONTAINER_ANSIBLE_ROOT/ansible.cfg"
+    CONTAINER_NAV_LOCAL="$CONTAINER_ANSIBLE_ROOT/scripts/ansible-nav-local"
+    TOOLBOX_WORKDIR="/opt/modulix/ansible"
+    TOOLBOX_HOME="/runner"
+    DEFAULT_VAULT_PASS_FILE="$PWD_ABS/.vault-pass.txt"
+    ;;
+esac
 
 RUN_EE_IMAGE="${RUN_EE_IMAGE:-quay.io/l-it/ee-wunder-ansible-ubi9-certified:v1.11.6}"
 RUN_TOOLBOX_IMAGE="${RUN_TOOLBOX_IMAGE:-quay.io/l-it/ee-wunder-toolbox-ubi9:v1.7.2}"
-VAULT_PASS_FILE="$(abs_path "${VAULT_PASS_FILE:-$ANSIBLE_ROOT_HOST/.vault-pass.txt}")"
+VAULT_PASS_FILE="$(abs_path "${VAULT_PASS_FILE:-$DEFAULT_VAULT_PASS_FILE}")"
 RUN_SKIP_CERT_CHECK="${RUN_SKIP_CERT_CHECK:-false}"
 RUN_ANSIBLE_LOCAL_TEMP="${ANSIBLE_LOCAL_TEMP:-/tmp/.ansible/tmp}"
 RUN_ANSIBLE_REMOTE_TEMP="${ANSIBLE_REMOTE_TEMP:-~/.ansible/tmp}"
 RUN_VAULT_TOKEN=""
+SSH_SOURCE_HOST=""
+SSH_AGENT_SOCKET_HOST=""
 
 case "$RUN_SKIP_CERT_CHECK" in
   true|false) ;;
   *) die "RUN_SKIP_CERT_CHECK must be true or false (got: $RUN_SKIP_CERT_CHECK)" ;;
 esac
 
-case "$VAULT_PASS_FILE" in
-  "$PWD_ABS"|"$PWD_ABS"/*) ;;
-  *) die "VAULT_PASS_FILE must be inside current directory ($PWD_ABS): $VAULT_PASS_FILE" ;;
-esac
 [[ -f "$VAULT_PASS_FILE" && -r "$VAULT_PASS_FILE" && -s "$VAULT_PASS_FILE" ]] || {
   die "required file missing or unreadable: $VAULT_PASS_FILE"
 }
-
-RUNNER_INVENTORY_DIR="$(runner_path "$INVENTORY_DIR")"
-RUNNER_VAULT_PASS_FILE="$(runner_path "$VAULT_PASS_FILE")"
-RUNNER_ANSIBLE_CONFIG="$(runner_path "$ANSIBLE_CONFIG_FILE_HOST")"
-RUNNER_ANSIBLE_ROOT="$(runner_path "$ANSIBLE_ROOT_HOST")"
-SSH_SOURCE_HOST=""
-SSH_AGENT_SOCKET_HOST=""
 
 resolve_vault_token() {
   local token="${VAULT_TOKEN:-${ROOT_TOKEN:-}}"
@@ -193,22 +244,24 @@ run_toolbox() {
   local ee_volume_mounts="${ANSIBLE_NAVIGATOR_EXECUTION_ENVIRONMENT_VOLUME_MOUNTS:-/opt/modulix:/opt/modulix:Z}"
   local mounts=(
     -v "$PWD_ABS:/runner/project:Z"
+    -v "$INVENTORY_DIR:$CONTAINER_INVENTORY_DIR:ro,Z"
+    -v "$VAULT_PASS_FILE:$CONTAINER_VAULT_PASS_FILE:ro,Z"
     -v "$SSH_SOURCE_HOST:/runner/project/.ssh:ro"
     -v "$SSH_SOURCE_HOST:/root/.ssh:ro"
   )
 
   local envs=(
-    -e HOME=/runner/project
+    -e "HOME=$TOOLBOX_HOME"
     -e ANSIBLE_TOOLBOX_NAV_EE_ENABLED=true
     -e "ANSIBLE_TOOLBOX_NAV_EE_IMAGE=$RUN_EE_IMAGE"
     -e "ANSIBLE_TOOLBOX_NAV_SKIP_CERT_CHECK=$RUN_SKIP_CERT_CHECK"
     -e ANSIBLE_TOOLBOX_AUTO_COLLECTIONS=false
-    -e "ANSIBLE_VAULT_PASSWORD_FILE=$RUNNER_VAULT_PASS_FILE"
+    -e "ANSIBLE_VAULT_PASSWORD_FILE=$CONTAINER_VAULT_PASS_FILE"
     -e "ANSIBLE_NAVIGATOR_EXECUTION_ENVIRONMENT_VOLUME_MOUNTS=$ee_volume_mounts"
     -e "ANSIBLE_LOCAL_TEMP=$RUN_ANSIBLE_LOCAL_TEMP"
     -e "ANSIBLE_REMOTE_TEMP=$RUN_ANSIBLE_REMOTE_TEMP"
     -e ANSIBLE_TOOLBOX_NAV_PULL_POLICY=never
-    -e "ANSIBLE_CONFIG=$RUNNER_ANSIBLE_CONFIG"
+    -e "ANSIBLE_CONFIG=$CONTAINER_ANSIBLE_CONFIG"
   )
   [[ -n "$RUN_VAULT_TOKEN" ]] && envs+=( -e "VAULT_TOKEN=${RUN_VAULT_TOKEN}" )
   if [[ "$forward_ssh_agent" == true && -n "$SSH_AGENT_SOCKET_HOST" ]]; then
@@ -220,7 +273,7 @@ run_toolbox() {
     --privileged \
     --security-opt label=disable \
     --user 0:0 \
-    -w /runner/project \
+    -w "$TOOLBOX_WORKDIR" \
     "${mounts[@]}" \
     "${envs[@]}" \
     "$RUN_TOOLBOX_IMAGE" \
@@ -234,7 +287,7 @@ rewrite_inventory_args() {
       -i|--inventory)
         [[ $# -ge 2 ]] || die "$1 requires a value"
         if [[ "$2" == inventories/* ]]; then
-          out+=( "$1" "$RUNNER_INVENTORY_DIR/${2#inventories/}" )
+          out+=( "$1" "$CONTAINER_INVENTORY_DIR/${2#inventories/}" )
         else
           out+=( "$1" "$2" )
         fi
@@ -243,7 +296,7 @@ rewrite_inventory_args() {
       --inventory=*)
         local inv="${1#*=}"
         if [[ "$inv" == inventories/* ]]; then
-          out+=( "--inventory=$RUNNER_INVENTORY_DIR/${inv#inventories/}" )
+          out+=( "--inventory=$CONTAINER_INVENTORY_DIR/${inv#inventories/}" )
         else
           out+=( "$1" )
         fi
@@ -265,18 +318,18 @@ resolve_service_playbook() {
 
   if [[ -n "$playbook_override" ]]; then
     case "$playbook_override" in
-      /*) printf '%s\n' "$playbook_override" ;;
-      playbooks/*) printf '%s\n' "${RUNNER_ANSIBLE_ROOT}/$playbook_override" ;;
+      /*) host_or_container_path "$playbook_override" ;;
+      playbooks/*) printf '%s\n' "${CONTAINER_ANSIBLE_ROOT}/$playbook_override" ;;
       *) die "invalid --playbook path '$playbook_override' (use absolute path or playbooks/...)" ;;
     esac
     return 0
   fi
 
   case "${service}:${rebuild}" in
-    wunderbox:true) printf '%s\n' "${RUNNER_ANSIBLE_ROOT}/playbooks/services/01-wunderbox-rebuild.yml" ;;
-    wunderbox:false) printf '%s\n' "${RUNNER_ANSIBLE_ROOT}/playbooks/stage-2b/12-wunderbox.yml" ;;
-    aap:true) printf '%s\n' "${RUNNER_ANSIBLE_ROOT}/playbooks/services/02-aap-rebuild.yml" ;;
-    aap:false) printf '%s\n' "${RUNNER_ANSIBLE_ROOT}/playbooks/stage-2b/13-aap.yml" ;;
+    wunderbox:true) printf '%s\n' "${CONTAINER_ANSIBLE_ROOT}/playbooks/services/01-wunderbox-rebuild.yml" ;;
+    wunderbox:false) printf '%s\n' "${CONTAINER_ANSIBLE_ROOT}/playbooks/stage-2b/12-wunderbox.yml" ;;
+    aap:true) printf '%s\n' "${CONTAINER_ANSIBLE_ROOT}/playbooks/services/02-aap-rebuild.yml" ;;
+    aap:false) printf '%s\n' "${CONTAINER_ANSIBLE_ROOT}/playbooks/stage-2b/13-aap.yml" ;;
     *) die "unsupported service '$service' (use: wunderbox | aap)" ;;
   esac
 }
@@ -352,8 +405,6 @@ run_services() {
     run_args+=( "$a" )
   done < <(rewrite_inventory_args "${SERVICE_ARGS[@]}")
 
-  local nav_local="${RUNNER_ANSIBLE_ROOT}/scripts/ansible-nav-local"
-
   ensure_image_available_on_host "$RUN_TOOLBOX_IMAGE"
   ensure_image_available_on_host "$RUN_EE_IMAGE"
 
@@ -376,7 +427,7 @@ run_services() {
     shift 2
     podman load -i "$ee_archive" >/dev/null
     exec "$nav_local" run "$@"
-  ' -- "$runner_ee_archive" "$nav_local" "$playbook" "${run_args[@]}"; then
+  ' -- "$runner_ee_archive" "$CONTAINER_NAV_LOCAL" "$playbook" "${run_args[@]}"; then
     rm -f -- "$ee_archive"
     return 1
   fi
