@@ -1,3 +1,9 @@
+## [1.2.0](https://github.com/lightning-it/modulix-launcher/compare/v1.1.0...v1.2.0) (2026-03-22)
+
+### Features
+
+* add runtime mode option and improve inventory directory handling ([#16](https://github.com/lightning-it/modulix-launcher/issues/16)) ([98c3f32](https://github.com/lightning-it/modulix-launcher/commit/98c3f3206e3adf650f9d726c5dd808330c5f1939))
+
 ## [1.1.0](https://github.com/lightning-it/modulix-launcher/compare/v1.0.3...v1.1.0) (2026-03-21)
 
 ### Features
