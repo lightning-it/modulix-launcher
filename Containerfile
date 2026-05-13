@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.23
+# syntax=docker/dockerfile:1.24
 ARG FEDORA_VERSION=45
 
 FROM quay.io/fedora/fedora:${FEDORA_VERSION} AS rpmbuilder
