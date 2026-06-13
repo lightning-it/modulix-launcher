@@ -1,3 +1,9 @@
+## [1.3.0](https://github.com/lightning-it/modulix-launcher/compare/v1.2.0...v1.3.0) (2026-06-13)
+
+### Features
+
+* add support for 'workbench' service in usage and playbook resolution ([#20](https://github.com/lightning-it/modulix-launcher/issues/20)) ([1b2f99a](https://github.com/lightning-it/modulix-launcher/commit/1b2f99a466a86c5960d0cda5af12dba839df60bd))
+
 ## [1.2.0](https://github.com/lightning-it/modulix-launcher/compare/v1.1.0...v1.2.0) (2026-03-22)
 
 ### Features
