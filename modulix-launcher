@@ -4,7 +4,7 @@ set -euo pipefail
 usage() {
   cat <<'USAGE'
 Usage:
-  modulix-launcher [--runtime-mode <auto|workspace|packaged>] --inventory-dir <PATH> services <wunderbox|aap> [--rebuild] [--playbook <PATH>] [ansible args...]
+  modulix-launcher [--runtime-mode <auto|workspace|packaged>] --inventory-dir <PATH> services <wunderbox|aap|workbench> [--rebuild] [--playbook <PATH>] [ansible args...]
   modulix-launcher [--runtime-mode <auto|workspace|packaged>] --inventory-dir <PATH> toolbox shell
 
 Notes:
@@ -330,7 +330,9 @@ resolve_service_playbook() {
     wunderbox:false) printf '%s\n' "${CONTAINER_ANSIBLE_ROOT}/playbooks/stage-2b/12-wunderbox.yml" ;;
     aap:true) printf '%s\n' "${CONTAINER_ANSIBLE_ROOT}/playbooks/services/02-aap-rebuild.yml" ;;
     aap:false) printf '%s\n' "${CONTAINER_ANSIBLE_ROOT}/playbooks/stage-2b/13-aap.yml" ;;
-    *) die "unsupported service '$service' (use: wunderbox | aap)" ;;
+    workbench:true) die "service 'workbench' does not support --rebuild; use --playbook or the default workbench run" ;;
+    workbench:false) printf '%s\n' "${CONTAINER_ANSIBLE_ROOT}/playbooks/stage-2b/11-workbench.yml" ;;
+    *) die "unsupported service '$service' (use: wunderbox | aap | workbench)" ;;
   esac
 }
 
