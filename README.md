@@ -88,6 +88,11 @@ modulix-launcher --inventory-dir "$INVENTORY_DIR" services aap --rebuild \
   -i "inventories/$INVENTORY_NAME/inventory.yml" --limit <HOST>
 ```
 
+```bash
+modulix-launcher --inventory-dir "$INVENTORY_DIR" services workbench \
+  -i "inventories/$INVENTORY_NAME/inventory.yml" --limit <HOST>
+```
+
 Run a specific playbook in `services` mode:
 
 ```bash
