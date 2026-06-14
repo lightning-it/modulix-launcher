@@ -1,3 +1,9 @@
+## [1.3.1](https://github.com/lightning-it/modulix-launcher/compare/v1.3.0...v1.3.1) (2026-06-14)
+
+### Bug Fixes
+
+* sync shared assets from lightning-it/shared-assets ([#21](https://github.com/lightning-it/modulix-launcher/issues/21)) ([872665e](https://github.com/lightning-it/modulix-launcher/commit/872665e3ad582e24b0284267b657b8575bda5872))
+
 ## [1.3.0](https://github.com/lightning-it/modulix-launcher/compare/v1.2.0...v1.3.0) (2026-06-13)
 
 ### Features
