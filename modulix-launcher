@@ -144,7 +144,7 @@ case "$ACTIVE_RUNTIME_MODE" in
     ;;
 esac
 
-RUN_EE_IMAGE="${RUN_EE_IMAGE:-quay.io/l-it/ee-wunder-ansible-ubi9-certified:v1.11.6}"
+RUN_EE_IMAGE="${RUN_EE_IMAGE:-quay.io/l-it/ee-wunder-ansible-ubi9-certified:v1.15.1}"
 RUN_TOOLBOX_IMAGE="${RUN_TOOLBOX_IMAGE:-quay.io/l-it/ee-wunder-toolbox-ubi9:v1.7.2}"
 VAULT_PASS_FILE="$(abs_path "${VAULT_PASS_FILE:-$DEFAULT_VAULT_PASS_FILE}")"
 RUN_SKIP_CERT_CHECK="${RUN_SKIP_CERT_CHECK:-false}"
