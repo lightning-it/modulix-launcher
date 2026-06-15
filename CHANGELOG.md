@@ -1,3 +1,9 @@
+## [1.3.2](https://github.com/lightning-it/modulix-launcher/compare/v1.3.1...v1.3.2) (2026-06-15)
+
+### Bug Fixes
+
+* update RUN_EE_IMAGE to version v1.15.1 ([#23](https://github.com/lightning-it/modulix-launcher/issues/23)) ([3db3d0d](https://github.com/lightning-it/modulix-launcher/commit/3db3d0dcd02751cab764323bccc80669eb78c612))
+
 ## [1.3.1](https://github.com/lightning-it/modulix-launcher/compare/v1.3.0...v1.3.1) (2026-06-14)
 
 ### Bug Fixes
