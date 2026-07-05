@@ -137,7 +137,7 @@ jobs:
           platforms: linux/amd64
           tags: ${{ env.IMAGE_NAME }}:trivy-${{ github.sha }}
 
-      - name: Run Trivy release gate before Quay publish
+      - name: Generate Trivy release gate SARIF
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.IMAGE_NAME }}:trivy-${{ github.sha }}
@@ -146,13 +146,22 @@ jobs:
           vuln-type: os,library
           ignore-unfixed: true
           severity: CRITICAL
-          exit-code: "1"
+          exit-code: "0"
 
       - name: Upload Trivy release gate SARIF
-        if: always()
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-release-gate.sarif
+
+      - name: Run Trivy release gate before Quay publish
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:trivy-${{ github.sha }}
+          format: table
+          vuln-type: os,library
+          ignore-unfixed: true
+          severity: CRITICAL
+          exit-code: "1"
 
       - name: Log in to Quay.io
         if: env.PUSH_IMAGE == 'true'
