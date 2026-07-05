@@ -26,7 +26,7 @@ on:
       - ".github/workflows/container-build-publish.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -135,6 +135,7 @@ jobs:
           password: ${{ secrets.QUAY_PASSWORD }}
 
       - name: Build and optionally push image
+        id: build_image
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -142,3 +143,45 @@ jobs:
           push: ${{ env.PUSH_IMAGE == 'true' }}
           platforms: linux/amd64,linux/arm64
           tags: ${{ env.IMAGE_TAGS }}
+
+      - name: Generate release evidence
+        shell: bash
+        env:
+          IMAGE_DIGEST: ${{ steps.build_image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          tags="$(tr '\n' ',' <<<"$IMAGE_TAGS" | sed 's/,$//')"
+          published=""
+          if [[ "$PUSH_IMAGE" == "true" ]]; then
+            published="$tags"
+          fi
+          TESTED_MATRIX="ubuntu-latest,docker-buildx,container-build" \
+          PASSED_JOBS="Build container image" \
+          BUILT_ARTIFACTS="${IMAGE_NAME}@${IMAGE_DIGEST:-local-build}" \
+          PUBLISHED_ARTIFACTS="$published" \
+          CONTAINER_IMAGE_TAGS="$tags" \
+          QUAY_IMAGE="${IMAGE_NAME}@${IMAGE_DIGEST:-not-pushed}" \
+          RELEASE_TAG="$IMAGE_TAG" \
+          RELEASE_VERSION="${IMAGE_TAG#v}" \
+          python3 scripts/generate-release-evidence.py
+
+      - name: Attach release evidence
+        if: github.event_name == 'release'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            dist/release-evidence.json \
+            dist/release-evidence.md \
+            --clobber
+
+      - name: Upload release evidence artifact
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: release-evidence
+          path: |
+            dist/release-evidence.json
+            dist/release-evidence.md
+          if-no-files-found: ignore
