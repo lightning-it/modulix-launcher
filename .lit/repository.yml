@@ -34,6 +34,7 @@ readme_badges:
 workflows:
   release: container-build-publish.yml
   ci: repository-quality.yml
+  container_build: container-build.yml
   trivy: container-trivy.yml
 image_name: quay.io/l-it/modulix-launcher
 registry: quay.io
