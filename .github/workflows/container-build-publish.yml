@@ -26,19 +26,22 @@ on:
       - ".github/workflows/container-build-publish.yml"
 
 permissions:
-  contents: write
+  contents: read
   security-events: write
 
 jobs:
   build:
     name: Build container image
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      security-events: write
     env:
       REGISTRY: quay.io
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7
 
       - name: Compute image name + tags
         shell: bash
@@ -221,7 +224,7 @@ jobs:
 
       - name: Upload release evidence artifact
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5
         with:
           name: release-evidence
           path: |
