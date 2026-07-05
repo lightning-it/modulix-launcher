@@ -5,6 +5,7 @@
 [![CI](https://github.com/lightning-it/modulix-launcher/actions/workflows/repository-quality.yml/badge.svg?branch=develop)](https://github.com/lightning-it/modulix-launcher/actions/workflows/repository-quality.yml)
 [![Latest Release](https://img.shields.io/github/v/release/lightning-it/modulix-launcher?sort=semver)](https://github.com/lightning-it/modulix-launcher/releases/latest)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/lightning-it/modulix-launcher/badge)](https://scorecard.dev/viewer/?uri=github.com/lightning-it/modulix-launcher)
+[![Container Version](https://img.shields.io/github/v/release/lightning-it/modulix-launcher?sort=semver&label=Container%20Version)](https://quay.io/repository/l-it/modulix-launcher)
 [![Trivy](https://github.com/lightning-it/modulix-launcher/actions/workflows/container-trivy.yml/badge.svg?branch=develop)](https://github.com/lightning-it/modulix-launcher/actions/workflows/container-trivy.yml)
 [![Container Build](https://github.com/lightning-it/modulix-launcher/actions/workflows/container-build.yml/badge.svg?branch=develop)](https://github.com/lightning-it/modulix-launcher/actions/workflows/container-build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
