@@ -14,7 +14,7 @@ test_profiles:
   - rpm-srpm
 os_matrix:
   - ubuntu-latest
-product_matrix:
+product_matrix: &id001
   - ubi9
   - podman
   - rpm
@@ -35,6 +35,21 @@ workflows:
   release: container-build-publish.yml
   ci: repository-quality.yml
   trivy: container-trivy.yml
+image_name: quay.io/l-it/modulix-launcher
+registry: quay.io
+quay_organization: l-it
+quay_repository: modulix-launcher
+version_source: semantic-release
+supported_base_images: *id001
+supported_target_platforms:
+  - linux/amd64
+  - linux/arm64
+smoke_test_command: repository default container smoke test
+healthcheck_expectation: container starts successfully where configured
+trivy_policy: CRITICAL gate with unfixed vulnerabilities ignored
+required_secrets:
+  - QUAY_USERNAME
+  - QUAY_PASSWORD
 containerfile: Containerfile
 container_build_context: .
 trivy_required: true
