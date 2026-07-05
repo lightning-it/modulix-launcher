@@ -1,30 +1,53 @@
 # modulix-launcher scripts
 
-<!-- BEGIN LIT_SHARED_RELEASE_MODEL -->
+<!-- BEGIN LIT_QUALITY_BADGES -->
 
 [![CI](https://github.com/lightning-it/modulix-launcher/actions/workflows/repository-quality.yml/badge.svg?branch=develop)](https://github.com/lightning-it/modulix-launcher/actions/workflows/repository-quality.yml)
-[![Release](https://github.com/lightning-it/modulix-launcher/actions/workflows/container-build-publish.yml/badge.svg?branch=main)](https://github.com/lightning-it/modulix-launcher/actions/workflows/container-build-publish.yml)
-[![Quay.io](https://img.shields.io/badge/quay.io-modulix-launcher-blue)](https://quay.io/organization/l-it)
+[![Latest Release](https://img.shields.io/github/v/release/lightning-it/modulix-launcher?sort=semver)](https://github.com/lightning-it/modulix-launcher/releases/latest)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/lightning-it/modulix-launcher/badge)](https://scorecard.dev/viewer/?uri=github.com/lightning-it/modulix-launcher)
+[![Quay.io](https://quay.io/repository/l-it/modulix-launcher/status)](https://quay.io/repository/l-it/modulix-launcher)
+[![Trivy](https://github.com/lightning-it/modulix-launcher/actions/workflows/container-trivy.yml/badge.svg?branch=develop)](https://github.com/lightning-it/modulix-launcher/actions/workflows/container-trivy.yml)
+[![Container Build](https://github.com/lightning-it/modulix-launcher/actions/workflows/container-build-publish.yml/badge.svg?branch=main)](https://github.com/lightning-it/modulix-launcher/actions/workflows/container-build-publish.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+
+<!-- END LIT_QUALITY_BADGES -->
+
+<!-- BEGIN LIT_COMPATIBILITY_MATRIX -->
+
+## Compatibility Matrix
+
+| Image Version | Image | Base Platform | Runtime | Test Type | Validation |
+|---|---|---|---|---|---|
+| Current release | quay.io/l-it/modulix-launcher | ubi9 | ubi9, podman, rpm | Build / Smoke / Trivy | See GitHub Release evidence |
+| Current release | quay.io/l-it/modulix-launcher | podman | ubi9, podman, rpm | Build / Smoke / Trivy | See GitHub Release evidence |
+| Current release | quay.io/l-it/modulix-launcher | rpm | ubi9, podman, rpm | Build / Smoke / Trivy | See GitHub Release evidence |
+
+Validation proof for each released version is stored in the corresponding GitHub Release evidence.
+
+<!-- END LIT_COMPATIBILITY_MATRIX -->
+
+<!-- BEGIN LIT_RELEASE_QUALITY_MODEL -->
 
 ## Release and Quality Model
 
 This repository follows the Lightning IT shared release and quality model.
+The README shows the current supported and tested matrix.
+Exact per-version proof is stored with every GitHub Release as `release-evidence.md` and `release-evidence.json`.
 
-See [RELEASE.md](./RELEASE.md) for:
+See:
 
-- branch and release flow
-- required quality checks
-- test matrix
-- release evidence
-- artifact publishing
-- supported repository-specific release behavior
+- [RELEASE.md](./RELEASE.md)
+- [TESTING.md](./TESTING.md)
+- [GitHub Releases](../../releases)
 
 Repository classification: **Container Image**.
-Required test profiles: `pre-commit, container-build, container-smoke, rpm-srpm`.
+Required test profiles: `pre-commit, container-build, container-smoke, trivy, rpm-srpm`.
 Publishing targets: `github-release, quay.io`.
 
-<!-- END LIT_SHARED_RELEASE_MODEL -->
+Release evidence records the exact GitHub Actions run, validated matrix rows, built artifacts, publish result, and security status for each release.
+
+<!-- END LIT_RELEASE_QUALITY_MODEL -->
+
 
 ## Overview
 

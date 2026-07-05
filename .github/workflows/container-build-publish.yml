@@ -26,18 +26,22 @@ on:
       - ".github/workflows/container-build-publish.yml"
 
 permissions:
-  contents: write
+  contents: read
+  security-events: write
 
 jobs:
   build:
     name: Build container image
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      security-events: write
     env:
       REGISTRY: quay.io
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7
 
       - name: Compute image name + tags
         shell: bash
@@ -126,6 +130,43 @@ jobs:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v4
 
+      - name: Build local image for Trivy release gate
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Containerfile
+          push: false
+          load: true
+          platforms: linux/amd64
+          tags: ${{ env.IMAGE_NAME }}:trivy-${{ github.sha }}
+
+      - name: Generate Trivy release gate SARIF
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:trivy-${{ github.sha }}
+          format: sarif
+          output: trivy-release-gate.sarif
+          vuln-type: os,library
+          ignore-unfixed: true
+          severity: CRITICAL
+          exit-code: "0"
+
+      - name: Upload Trivy release gate SARIF
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-release-gate.sarif
+
+      - name: Run Trivy release gate before Quay publish
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:trivy-${{ github.sha }}
+          format: table
+          vuln-type: os,library
+          ignore-unfixed: true
+          severity: CRITICAL
+          exit-code: "1"
+
       - name: Log in to Quay.io
         if: env.PUSH_IMAGE == 'true'
         uses: docker/login-action@v4
@@ -163,6 +204,11 @@ jobs:
           QUAY_IMAGE="${IMAGE_NAME}@${IMAGE_DIGEST:-not-pushed}" \
           RELEASE_TAG="$IMAGE_TAG" \
           RELEASE_VERSION="${IMAGE_TAG#v}" \
+          SECURITY_SCAN_RESULT="trivy-completed" \
+          TRIVY_STATUS="passed" \
+          TRIVY_RELEASE_GATE="passed-before-quay-publish" \
+          TRIVY_SEVERITY="CRITICAL" \
+          TRIVY_REPORT="trivy-release-gate.sarif" \
           python3 scripts/generate-release-evidence.py
 
       - name: Attach release evidence
@@ -178,7 +224,7 @@ jobs:
 
       - name: Upload release evidence artifact
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5
         with:
           name: release-evidence
           path: |
