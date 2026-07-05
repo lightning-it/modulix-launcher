@@ -6,6 +6,7 @@
 [![Latest Release](https://img.shields.io/github/v/release/lightning-it/modulix-launcher?sort=semver)](https://github.com/lightning-it/modulix-launcher/releases/latest)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/lightning-it/modulix-launcher/badge)](https://scorecard.dev/viewer/?uri=github.com/lightning-it/modulix-launcher)
 [![Quay.io](https://quay.io/repository/l-it/modulix-launcher/status)](https://quay.io/repository/l-it/modulix-launcher)
+[![Trivy](https://github.com/lightning-it/modulix-launcher/actions/workflows/container-trivy.yml/badge.svg?branch=develop)](https://github.com/lightning-it/modulix-launcher/actions/workflows/container-trivy.yml)
 [![Container Build](https://github.com/lightning-it/modulix-launcher/actions/workflows/container-build-publish.yml/badge.svg?branch=main)](https://github.com/lightning-it/modulix-launcher/actions/workflows/container-build-publish.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
@@ -27,7 +28,7 @@ See [RELEASE.md](./RELEASE.md) for:
 - supported repository-specific release behavior
 
 Repository classification: **Container Image**.
-Required test profiles: `pre-commit, container-build, container-smoke, rpm-srpm`.
+Required test profiles: `pre-commit, container-build, container-smoke, trivy, rpm-srpm`.
 Publishing targets: `github-release, quay.io`.
 
 ## Supported and Tested Platforms

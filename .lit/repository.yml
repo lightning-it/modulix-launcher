@@ -1,3 +1,4 @@
+---
 schema_version: 1
 managed_by: lightning-it/shared-assets
 repository: modulix-launcher
@@ -6,28 +7,35 @@ repository_type: container_image
 release_type: semantic_release
 artifact_type: container_image
 test_profiles:
-- pre-commit
-- container-build
-- container-smoke
-- rpm-srpm
+  - pre-commit
+  - container-build
+  - container-smoke
+  - trivy
+  - rpm-srpm
 os_matrix:
-- ubuntu-latest
+  - ubuntu-latest
 product_matrix:
-- ubi9
-- podman
-- rpm
+  - ubi9
+  - podman
+  - rpm
 publishing_targets:
-- github-release
-- quay.io
+  - github-release
+  - quay.io
 galaxy_publish: false
 quay_publish: true
 release_evidence: true
 heavy_incus_required: false
 readme_badges:
-- pre-commit
-- container-build
-- quay
-- license
+  - pre-commit
+  - container-build
+  - trivy
+  - quay
+  - license
 workflows:
   release: container-build-publish.yml
   ci: repository-quality.yml
+  trivy: container-trivy.yml
+containerfile: Containerfile
+container_build_context: .
+trivy_required: true
+trivy_release_gate: true

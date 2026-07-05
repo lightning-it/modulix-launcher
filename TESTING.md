@@ -7,6 +7,7 @@ This repository uses the Lightning IT shared test model.
 - `pre-commit`
 - `container-build`
 - `container-smoke`
+- `trivy`
 - `rpm-srpm`
 
 ## Supported Matrix
