@@ -75,7 +75,10 @@ export VAULT_PASS_FILE="$WORKSPACE_ROOT/modulix-automation/ansible/.vault-pass.t
 # optional: disable TLS cert verification for image pulls
 export RUN_SKIP_CERT_CHECK=false
 [[ -s "$VAULT_PASS_FILE" ]] || { echo "ERROR: missing or empty Vault password file: $VAULT_PASS_FILE" >&2; false; }
-command -v modulix-launcher >/dev/null || { echo "ERROR: modulix-launcher not found in PATH" >&2; false; }
+if ! command -v modulix-launcher; then
+  echo "ERROR: modulix-launcher not found in PATH" >&2
+  false
+fi
 ```
 
 If your mirror uses an untrusted/private CA:
