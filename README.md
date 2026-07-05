@@ -2,6 +2,7 @@
 
 <!-- BEGIN LIT_SHARED_RELEASE_MODEL -->
 
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/lightning-it/modulix-launcher/badge)](https://scorecard.dev/viewer/?uri=github.com/lightning-it/modulix-launcher)
 [![CI](https://github.com/lightning-it/modulix-launcher/actions/workflows/repository-quality.yml/badge.svg?branch=develop)](https://github.com/lightning-it/modulix-launcher/actions/workflows/repository-quality.yml)
 [![Release](https://github.com/lightning-it/modulix-launcher/actions/workflows/container-build-publish.yml/badge.svg?branch=main)](https://github.com/lightning-it/modulix-launcher/actions/workflows/container-build-publish.yml)
 [![Quay.io](https://img.shields.io/badge/quay.io-modulix-launcher-blue)](https://quay.io/organization/l-it)
