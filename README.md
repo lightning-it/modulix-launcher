@@ -1,5 +1,31 @@
 # modulix-launcher scripts
 
+<!-- BEGIN LIT_SHARED_RELEASE_MODEL -->
+
+[![CI](https://github.com/lightning-it/modulix-launcher/actions/workflows/repository-quality.yml/badge.svg?branch=develop)](https://github.com/lightning-it/modulix-launcher/actions/workflows/repository-quality.yml)
+[![Release](https://github.com/lightning-it/modulix-launcher/actions/workflows/container-build-publish.yml/badge.svg?branch=main)](https://github.com/lightning-it/modulix-launcher/actions/workflows/container-build-publish.yml)
+[![Quay.io](https://img.shields.io/badge/quay.io-modulix-launcher-blue)](https://quay.io/organization/l-it)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+
+## Release and Quality Model
+
+This repository follows the Lightning IT shared release and quality model.
+
+See [RELEASE.md](./RELEASE.md) for:
+
+- branch and release flow
+- required quality checks
+- test matrix
+- release evidence
+- artifact publishing
+- supported repository-specific release behavior
+
+Repository classification: **Container Image**.
+Required test profiles: `pre-commit, container-build, container-smoke, rpm-srpm`.
+Publishing targets: `github-release, quay.io`.
+
+<!-- END LIT_SHARED_RELEASE_MODEL -->
+
 ## Overview
 
 Use `modulix-launcher` to run Modulix automation playbooks from published container images.
