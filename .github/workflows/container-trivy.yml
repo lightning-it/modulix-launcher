@@ -1,0 +1,39 @@
+# yamllint disable rule:truthy
+---
+name: Trivy
+
+on:
+  pull_request:
+    paths:
+      - "Containerfile"
+      - ".dockerignore"
+      - "packaging/container/**"
+      - "packaging/rpm/**"
+      - "modulix-launcher"
+      - ".github/workflows/container-trivy.yml"
+  push:
+    branches: ["develop", "main"]
+    paths:
+      - "Containerfile"
+      - ".dockerignore"
+      - "packaging/container/**"
+      - "packaging/rpm/**"
+      - "modulix-launcher"
+      - ".github/workflows/container-trivy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trivy:
+    name: Trivy
+    permissions:
+      contents: read
+      security-events: write
+    uses: lightning-it/.github/.github/workflows/container-trivy-reusable.yml@main
+    with:
+      image_name: local/modulix-launcher
+      containerfile: ./Containerfile
+      context: .
+      severity: CRITICAL

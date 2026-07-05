@@ -9,6 +9,7 @@ test_profiles:
 - pre-commit
 - container-build
 - container-smoke
+- trivy
 - rpm-srpm
 os_matrix:
 - ubuntu-latest
@@ -26,8 +27,14 @@ heavy_incus_required: false
 readme_badges:
 - pre-commit
 - container-build
+- trivy
 - quay
 - license
 workflows:
   release: container-build-publish.yml
   ci: repository-quality.yml
+  trivy: container-trivy.yml
+containerfile: Containerfile
+container_build_context: .
+trivy_required: true
+trivy_release_gate: true
