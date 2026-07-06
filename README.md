@@ -1,53 +1,46 @@
 # modulix-launcher scripts
 
+<!-- BEGIN LIT_SHARED_RELEASE_MODEL -->
+
+## Release and Quality Model
+
+This repository follows the Lightning IT shared release and quality model.
+
+See [RELEASE.md](./RELEASE.md) for:
+
+- branch and release flow
+- required quality checks
+- test matrix
+- release evidence
+- artifact publishing
+- supported repository-specific release behavior
+
+Repository classification: **Container Image**.
+Required test profiles: `pre-commit, container-build, container-smoke, rpm-srpm`.
+Publishing targets: `github-release, quay.io`.
+
+## Supported and Tested Platforms
+
+| Platform / Product | Status | Validation |
+|---|---:|---|
+| ubuntu-latest | Supported | Container CI / Trivy |
+| ubi9 | Tested where applicable | Container CI / Trivy |
+| podman | Tested where applicable | Container CI / Trivy |
+| rpm | Tested where applicable | Container CI / Trivy |
+
+<!-- END LIT_SHARED_RELEASE_MODEL -->
+
 <!-- BEGIN LIT_QUALITY_BADGES -->
 
 [![CI](https://github.com/lightning-it/modulix-launcher/actions/workflows/repository-quality.yml/badge.svg?branch=develop)](https://github.com/lightning-it/modulix-launcher/actions/workflows/repository-quality.yml)
 [![Latest Release](https://img.shields.io/github/v/release/lightning-it/modulix-launcher?sort=semver)](https://github.com/lightning-it/modulix-launcher/releases/latest)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/lightning-it/modulix-launcher/badge)](https://scorecard.dev/viewer/?uri=github.com/lightning-it/modulix-launcher)
 [![Quay.io](https://quay.io/repository/l-it/modulix-launcher/status)](https://quay.io/repository/l-it/modulix-launcher)
-[![Trivy](https://github.com/lightning-it/modulix-launcher/actions/workflows/container-trivy.yml/badge.svg?branch=develop)](https://github.com/lightning-it/modulix-launcher/actions/workflows/container-trivy.yml)
+[![Trivy](https://github.com/lightning-it/modulix-launcher/actions/workflows/container-build-publish.yml/badge.svg?branch=main)](https://github.com/lightning-it/modulix-launcher/actions/workflows/container-build-publish.yml)
 [![Container Build](https://github.com/lightning-it/modulix-launcher/actions/workflows/container-build-publish.yml/badge.svg?branch=main)](https://github.com/lightning-it/modulix-launcher/actions/workflows/container-build-publish.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
 <!-- END LIT_QUALITY_BADGES -->
-
-<!-- BEGIN LIT_COMPATIBILITY_MATRIX -->
-
-## Compatibility Matrix
-
-| Image Version | Image | Base Platform | Runtime | Test Type | Validation |
-|---|---|---|---|---|---|
-| Current release | quay.io/l-it/modulix-launcher | ubi9 | ubi9, podman, rpm | Build / Smoke / Trivy | See GitHub Release evidence |
-| Current release | quay.io/l-it/modulix-launcher | podman | ubi9, podman, rpm | Build / Smoke / Trivy | See GitHub Release evidence |
-| Current release | quay.io/l-it/modulix-launcher | rpm | ubi9, podman, rpm | Build / Smoke / Trivy | See GitHub Release evidence |
-
-Validation proof for each released version is stored in the corresponding GitHub Release evidence.
-
-<!-- END LIT_COMPATIBILITY_MATRIX -->
-
-<!-- BEGIN LIT_RELEASE_QUALITY_MODEL -->
-
-## Release and Quality Model
-
-This repository follows the Lightning IT shared release and quality model.
-The README shows the current supported and tested matrix.
-Exact per-version proof is stored with every GitHub Release as `release-evidence.md` and `release-evidence.json`.
-
-See:
-
-- [RELEASE.md](./RELEASE.md)
-- [TESTING.md](./TESTING.md)
-- [GitHub Releases](../../releases)
-
-Repository classification: **Container Image**.
-Required test profiles: `pre-commit, container-build, container-smoke, trivy, rpm-srpm`.
-Publishing targets: `github-release, quay.io`.
-
-Release evidence records the exact GitHub Actions run, validated matrix rows, built artifacts, publish result, and security status for each release.
-
-<!-- END LIT_RELEASE_QUALITY_MODEL -->
-
 
 ## Overview
 
@@ -75,7 +68,10 @@ export VAULT_PASS_FILE="$WORKSPACE_ROOT/modulix-automation/ansible/.vault-pass.t
 # optional: disable TLS cert verification for image pulls
 export RUN_SKIP_CERT_CHECK=false
 [[ -s "$VAULT_PASS_FILE" ]] || { echo "ERROR: missing or empty Vault password file: $VAULT_PASS_FILE" >&2; false; }
-command -v modulix-launcher >/dev/null || { echo "ERROR: modulix-launcher not found in PATH" >&2; false; }
+if ! command -v modulix-launcher; then
+  echo "ERROR: modulix-launcher not found in PATH" >&2
+  false
+fi
 ```
 
 If your mirror uses an untrusted/private CA:
@@ -205,3 +201,64 @@ packaging/container/push-image.sh \
 CI workflow for container build/push:
 
 - `.github/workflows/container-build-publish.yml`
+
+## Security
+
+See [SECURITY.md](./SECURITY.md) for supported versions and vulnerability reporting.
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for contribution and review expectations.
+
+## License
+
+See [LICENSE](./LICENSE).
+
+<!-- BEGIN LIT_RELEASE_QUALITY_MODEL -->
+
+## Release and Quality Model
+
+This repository follows the Lightning IT shared release and quality model.
+The README shows the current supported and tested matrix.
+Exact per-version validation proof is stored with each GitHub Release as `release-evidence.md` and `release-evidence.json`.
+Releases are created from the protected `main` branch after a reviewed `develop -> main` release promotion.
+Container releases validate build, smoke behavior, Trivy scanning, and Quay.io publishing where enabled.
+
+See:
+
+- [RELEASE.md](./RELEASE.md)
+- [TESTING.md](./TESTING.md)
+- [GitHub Releases](../../releases)
+
+Repository classification: **Container Image**.
+Required test profiles: `pre-commit, container-build, container-smoke, trivy, rpm-srpm`.
+Publishing targets: `github-release, quay.io`.
+
+<!-- END LIT_RELEASE_QUALITY_MODEL -->
+
+<!-- BEGIN LIT_COMPATIBILITY_MATRIX -->
+
+## Compatibility Matrix
+
+| Image Version | Base Image | Runtime | Validation |
+|---|---|---|---|
+| Latest release | ubi9 | Podman / GitHub Actions | See release evidence |
+| Latest release | podman | Podman / GitHub Actions | See release evidence |
+| Latest release | rpm | Podman / GitHub Actions | See release evidence |
+
+Validation proof for each released version is stored in the corresponding GitHub Release evidence.
+
+<!-- END LIT_COMPATIBILITY_MATRIX -->
+
+## Release Evidence
+
+Every released version includes immutable release evidence attached to the corresponding GitHub Release.
+The evidence records:
+
+- tested matrix combinations
+- GitHub Actions run links
+- artifact references
+- publish status
+- security scan status
+
+See [GitHub Releases](../../releases), [RELEASE.md](./RELEASE.md), and [TESTING.md](./TESTING.md) for the release process and validation model.
