@@ -24,7 +24,7 @@ This repository follows the Lightning IT shared release and quality model.
 
 ## Mandatory Quality Gates
 
-- Required profiles: `pre-commit, container-build, container-smoke, rpm-srpm`.
+- Required profiles: `pre-commit, container-build, container-smoke, trivy, rpm-srpm`.
 - OS matrix: `ubuntu-latest`.
 - Product/runtime matrix: `ubi9, podman, rpm`.
 - Fork pull requests run validation without publishing credentials.
