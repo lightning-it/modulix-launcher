@@ -26,6 +26,8 @@ galaxy_publish: false
 quay_publish: true
 release_evidence: true
 heavy_incus_required: false
+trivy_required: true
+trivy_release_gate: true
 readme_badges:
   - pre-commit
   - container-build
