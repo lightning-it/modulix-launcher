@@ -12,6 +12,7 @@ test_profiles:
   - container-build
   - container-smoke
   - trivy
+  - fuzzing
   - rpm-srpm
 os_matrix:
   - ubuntu-latest
