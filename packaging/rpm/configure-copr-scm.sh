@@ -132,4 +132,3 @@ fi
 echo
 echo "Configured ${copr_ref}/${package} for SCM + make_srpm + webhook-rebuild=${webhook_rebuild}."
 echo "Next step (UI): copy webhook URL from COPR Settings -> Integrations and add it in GitHub Webhooks."
-
