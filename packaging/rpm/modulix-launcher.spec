@@ -38,4 +38,3 @@ install -m 0755 modulix-launcher %{buildroot}%{_bindir}/modulix-launcher
 %changelog
 * Sat Feb 28 2026 Lightning IT <opensource@l-it.io> - %{version}-%{release}
 - Initial RPM packaging for modulix-launcher.
-

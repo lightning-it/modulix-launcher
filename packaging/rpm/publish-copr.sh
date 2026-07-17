@@ -93,4 +93,3 @@ fi
 
 copr-cli build "${owner}/${project}" "${srpm_path}"
 echo "Submitted ${srpm_path} to COPR ${owner}/${project}"
-

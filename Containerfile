@@ -40,4 +40,3 @@ RUN dnf -y install /tmp/rpms/modulix-launcher-*.rpm && \
 
 ENTRYPOINT ["/usr/local/bin/modulix-launcher"]
 CMD ["--help"]
-
